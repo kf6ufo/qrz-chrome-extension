@@ -5,12 +5,37 @@ Highlight one callsign on a page, right-click, and choose **QRZ**:
 - **Lookup Callsign** opens the public QRZ station page in a new tab.
 - **Search My Logbook** reuses a QRZ Logbook tab in any Chrome window, activates it, restores a minimized window, fills the search field, and clicks Find. If no tab exists, it opens the logbook and waits for it. An already open logbook is not reloaded for each search.
 
-## Load or update in Chrome
+## Download the extension
+
+First, save the repository to a permanent folder on your computer. Choose either method:
+
+- **Download ZIP (no Git required):** Open the [GitHub repository](https://github.com/kf6ufo/qrz-chrome-extension), choose **Code → Download ZIP**, and extract the ZIP. Move the extracted `qrz-chrome-extension-main` folder somewhere you want to keep it.
+- **Clone with Git:** Open a terminal in the parent folder where you want to keep the extension, then run:
+
+  ```sh
+  git clone https://github.com/kf6ufo/qrz-chrome-extension.git
+  ```
+
+The extension folder is the downloaded or cloned folder containing `manifest.json`. Keep it in place after loading it in Chrome; Chrome uses these local files.
+
+## Load in Chrome
 
 1. Open `chrome://extensions` and turn on **Developer mode**.
-2. If the previous version is already installed from this folder, click its **Reload** button. Otherwise click **Load unpacked** and select this folder (the one containing `manifest.json`).
+2. If the previous version is already installed from this folder, click its **Reload** button. Otherwise click **Load unpacked** and select the extension folder you downloaded or cloned (the one containing `manifest.json`, not `previous-version/`).
 3. Accept Chrome's requested QRZ Logbook site access. Sign in at https://logbook.qrz.com/logbook using your normal QRZ account.
 4. Highlight `KF6UFO`, right-click, and try each menu item. For logbook reuse, keep the QRZ tab in a second window and try another callsign: the same tab should come forward and show the new search.
+
+## Update an installed copy
+
+If you cloned with Git, open a terminal in your `qrz-chrome-extension` folder and run:
+
+```sh
+git pull --ff-only
+```
+
+If you downloaded a ZIP, download and extract the latest ZIP, then copy its contents into the same extension folder, replacing the older files.
+
+After either method, open `chrome://extensions` and click **Reload** on QRZ Callsign Lookup.
 
 ## Callsigns
 
