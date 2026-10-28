@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "QRZ Callsign Lookup",
+  "version": "2.0.0",
+  "description": "Right-click a callsign to look it up on QRZ or search your existing QRZ Logbook session.",
+  "permissions": ["contextMenus", "scripting"],
+  "host_permissions": ["https://logbook.qrz.com/*"],
+  "background": {"service_worker": "background.js", "type": "module"},
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

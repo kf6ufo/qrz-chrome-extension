@@ -1,0 +1,5 @@
+:root { color-scheme: light dark; font: 18px/1.6 system-ui, sans-serif; }
+body { margin: 0; background: light-dark(#f1f5f9, #0b1729); color: light-dark(#12223b, #e2e8f0); }
+main { max-width: 600px; margin: 8vh auto; padding: 32px; }
+h1 { font-size: 30px; margin-bottom: 12px; }
+a { color: light-dark(#036976, #54d4d0); }

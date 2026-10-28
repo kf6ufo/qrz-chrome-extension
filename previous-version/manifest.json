@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "QRZ Callsign Lookup",
+  "version": "1.0",
+  "description": "Right-click a highlighted callsign to look it up on QRZ.",
+  "permissions": ["contextMenus"],
+  "background": {
+    "service_worker": "background.js"
+  }
+}
