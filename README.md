@@ -5,6 +5,10 @@ Highlight one callsign on a page, right-click, and choose **QRZ**:
 - **Lookup Callsign** opens the public QRZ station page in a new tab.
 - **Search My Logbook** reuses a QRZ Logbook tab in any Chrome window, activates it, restores a minimized window, fills the search field, and clicks Find. If no tab exists, it opens the logbook and waits for it. An already open logbook is not reloaded for each search.
 
+![QRZ context menu on a highlighted callsign in PSK Reporter](docs/images/qrz-context-menu.png)
+
+*Right-click a highlighted callsign in PSK Reporter to choose **QRZ → Lookup Callsign** or **QRZ → Search My Logbook**.*
+
 ## Download the extension
 
 First, save the repository to a permanent folder on your computer. Choose either method:
