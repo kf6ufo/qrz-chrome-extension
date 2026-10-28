@@ -7,7 +7,7 @@ Highlight one callsign on a page, right-click, and choose **QRZ**:
 
 ![QRZ context menu on a highlighted callsign in PSK Reporter](docs/images/qrz-context-menu.png)
 
-*Right-click a highlighted callsign in PSK Reporter to choose **QRZ → Lookup Callsign** or **QRZ → Search My Logbook**.*
+*Right-click a highlighted callsign on a web page to choose **QRZ → Lookup Callsign** or **QRZ → Search My Logbook**.*
 
 ## Download the extension
 
