@@ -140,7 +140,7 @@ export function showWebLogFeedback(callsign, message) {
   title.textContent = `QRZ · ${callsign}`;
   const version = document.createElement("small");
   version.style.cssText = "font-size:11px;font-weight:400;margin-left:10px";
-  version.textContent = "v2.2.5";
+  version.textContent = "v2.2.6";
   title.append(version);
   const text = document.createElement("p");
   text.textContent = message;

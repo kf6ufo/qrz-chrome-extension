@@ -36,7 +36,7 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 async function showError(message) {
-  console.warn("QRZ Lookup:", message);
+  console.warn("QRZ Callsign Extension:", message);
   await chrome.tabs.create({ url: chrome.runtime.getURL("help.html") + "#" + encodeURIComponent(message) });
 }
 

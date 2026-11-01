@@ -1,10 +1,12 @@
-# Verification — QRZ Callsign Lookup 2.2.5
+# Verification — QRZ Callsign Extension 2.2.6
 
 Verified November 1, 2026. The verification set contains **99 local checks**.
 
+Version 2.2.6 updates the extension name, README, help-page heading, feedback version, and documentation screenshot. Its Web Log and notification behavior is unchanged from 2.2.5.
+
 | Check | Result | Latest execution |
 | --- | --- | --- |
-| Background orchestration and menu tests | 45/45 | Rerun for 2.2.5 |
+| Background orchestration and menu tests | 45/45 | Rerun for 2.2.6 |
 | Web Log browser fixtures in Chrome | 41/41 | Rerun for 2.2.5 |
 | Notification callsign browser fixtures in Chrome | 13/13 | Prior passing run; notification code unchanged |
 
