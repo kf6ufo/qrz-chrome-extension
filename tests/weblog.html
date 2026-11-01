@@ -1,0 +1,169 @@
+<!doctype html><meta charset="utf-8"><title>QRZ Web Log safety tests</title>
+<style>body{font:16px/1.5 system-ui;margin:40px;max-width:1000px}iframe{width:100%;height:220px}pre{white-space:pre-wrap}</style>
+<h1>QRZ Web Log safety tests</h1><p>Local synthetic fixtures based on inspected QRZ controls. No requests are sent to QRZ.</p><button id="run">Run safety tests</button><pre id="results">Ready</pre><iframe id="fixture"></iframe>
+<script type="module">
+import {webLogPage} from '../weblog.js';
+const frame = document.querySelector('iframe'), output = document.querySelector('pre');
+// Substitute only location in this test copy: production retains its HTTPS guard.
+const build = (win, station='KE9ZZ') => win.Function('fixtureLocation', `return (${webLogPage.toString().replace(/\blocation\b/g, 'fixtureLocation')})`)({origin:'https://www.qrz.com',href:'https://www.qrz.com/db/'+encodeURIComponent(station),pathname:'/db/'+encodeURIComponent(station)});
+const base = (content, web=true, station='KE9ZZ') => `<div id="qrztop"><ul><li><a href="https://www.qrz.com/db/KF6UFO">KF6UFO page...</a></li><li><a href="https://www.qrz.com/logout/test">Logout</a></li></ul></div><div id="csdata"><span class="csigns hamcall">${station}</span></div><div id="tabs"><ul role="tablist"><li role="tab" aria-selected="${!web}"><a href="#t_bio">Biography</a></li>${web ? '<li role="tab" aria-selected="true"><a href="#t_webcon">Web <span>241</span></a></li>' : ''}</ul><div id="t_bio" aria-hidden="${web}"${web ? ' style="display:none"' : ''}><p>Station biography</p></div>${web ? `<div id="t_webcon" aria-hidden="false">${content}</div>` : ''}</div>`;
+// QRZ uses csignmg instead of csigns for managed station headings such as JD1BQP.
+const managedBase = (content, web=true, station='JD1BQP') => base(content,web,station).replace('class="csigns hamcall"','class="csignmg hamcall"');
+const form = `<div>Add your Web Contact:<form method="post" action="https://www.qrz.com/db/KE9ZZ"><input type="hidden" name="webcon"><input type="hidden" name="wc_userid"><input type="text" name="wc_comment"><input type="submit" value="DE KF6UFO"></form></div><div id="wclist"></div>`;
+const confirmation = '<p>Your Web Contact, KF6UFO was added on 2026-10-31 18:00:00</p>';
+// Structure inspected on KF0WAP: explanatory paragraph precedes the prompt/form.
+// Account, hidden values, and explanatory wording are synthetic fixture data.
+const kf0wapForm = `<p>Visitors may add a Web Contact for this station.</p><div>Add your Web Contact:<form method="post" action="https://www.qrz.com/db/KF0WAP"><input type="hidden" name="webcon" value="1"><input type="hidden" name="wc_userid" value="12345"><input type="text" name="wc_comment" value=""><input type="submit" value="DE KF6UFO"></form></div><div id="wclist"></div>`;
+
+const cases = [
+ ['unsigned form', form, 'unsigned'],
+ ['already signed', confirmation, 'already-signed'],
+ ['no Web tab', '', 'no-web-tab', null, false],
+ ['login required', form, 'login-required', d=>d.querySelector('#qrztop').textContent='Login'],
+ ['unknown account', form, 'ambiguous', d=>d.querySelector('#qrztop a').remove()],
+ ['wrong station heading', form, 'ambiguous', d=>d.querySelector('.hamcall').textContent='EA4IJS'],
+ ['draft comment', form, 'ambiguous', d=>d.querySelector('[name=wc_comment]').value='Keep my draft'],
+ ['wrong action', form, 'ambiguous', d=>d.querySelector('form').action='https://www.qrz.com/db/EA4IJS'],
+ ['foreign action', form, 'ambiguous', d=>d.querySelector('form').action='https://example.org/db/KE9ZZ'],
+ ['wrong submit identity', form, 'ambiguous', d=>d.querySelector('[type=submit]').value='DE W1AW'],
+ ['disabled submit', form, 'ambiguous', d=>d.querySelector('[type=submit]').disabled=true],
+ ['overridden action', form, 'ambiguous', d=>d.querySelector('[type=submit]').setAttribute('formaction','https://example.org')],
+ ['extra field', form, 'ambiguous', d=>d.querySelector('form').insertAdjacentHTML('beforeend','<input name=unexpected>')],
+ ['signed plus form', form+confirmation, 'ambiguous'],
+ ['visitor entry conflicts', form, 'ambiguous', d=>d.querySelector('#wclist').innerHTML='<a href="https://www.qrz.com/db/KF6UFO/">KF6UFO</a>'],
+ ['hidden submit', form, 'ambiguous', d=>d.querySelector('[type=submit]').style.display='none', true, 'sign'],
+ ['account changed', form, 'ambiguous', null, true, 'sign', 'W1AW'],
+ ['ambiguous missing panel', form, 'ambiguous', d=>d.querySelector('#t_webcon').remove()],
+ ['opens a collapsed Web tab', form, 'unsigned', d=>{d.querySelector('a[href="#t_bio"]').click();}]
+];
+const reasons = {
+ 'unknown account':'account-menu', 'wrong station heading':'station',
+ 'draft comment':'comment-draft', 'wrong action':'form-destination',
+ 'foreign action':'form-destination', 'wrong submit identity':'submit-identity',
+ 'disabled submit':'submit-controls', 'overridden action':'submit-controls',
+ 'extra field':'form-fields', 'signed plus form':'form-conflict',
+ 'visitor entry conflicts':'form-conflict', 'hidden submit':'form-hidden',
+ 'account changed':'account-changed', 'ambiguous missing panel':'web-layout'
+};
+document.querySelector('button').onclick = async () => {
+ output.textContent=''; let passed=0,total=0;
+ function check(name, ok, details='') {total++;passed+=Boolean(ok);output.textContent+=`${ok?'PASS':'FAIL'} ${name}${details ? ': '+details : ''}\n`;}
+ async function load(html) {
+   const ready=new Promise(resolve=>frame.onload=resolve);frame.srcdoc=html;await ready;
+   const d=frame.contentDocument;
+   for(const link of d.querySelectorAll('#tabs > ul[role=tablist] a')) {
+     link.addEventListener('click',e=>{
+       e.preventDefault();
+       for(const other of d.querySelectorAll('#tabs > ul[role=tablist] a')) {
+         const selected=other===link,panel=d.querySelector(other.getAttribute('href'));
+         other.closest('[role=tab]').setAttribute('aria-selected',String(selected));
+         panel?.setAttribute('aria-hidden',String(!selected));
+         if(panel)panel.style.display=selected?'block':'none';
+       }
+     });
+   }
+   return d;
+ }
+ for(const [name,html,expected,mutate,web=true,mode='prepare',account=null] of cases){
+   const d=await load(base(html,web)); mutate?.(d); let clicks=0;
+   d.addEventListener('submit',e=>{e.preventDefault();clicks++;});
+   const got=await build(frame.contentWindow)('KE9ZZ',mode,account);
+   const reasonOK=expected!=='ambiguous'||(typeof got.reason==='string'&&got.reason===reasons[name]);
+   check(name,got.status===expected && clicks===0 && reasonOK,`${got.status}${got.reason?' ('+got.reason+')':''}; submissions ${clicks}`);
+ }
+ // An early injection must not inspect or submit even complete-looking markup
+ // while the browser is still parsing the document.
+ for(const [name,mode,expected,reason] of [
+   ['prepare waits for HTML parsing before touching tabs','prepare','loading',null],
+   ['sign cannot submit while HTML parsing is unfinished','sign','ambiguous','page-loading']
+ ]) {
+   const doc=await load(base(form));let tabClicks=0,submits=0;
+   for(const link of doc.querySelectorAll('#tabs > ul[role=tablist] a'))link.addEventListener('click',()=>tabClicks++);
+   doc.addEventListener('submit',e=>{e.preventDefault();submits++;});
+   Object.defineProperty(doc,'readyState',{value:'loading',configurable:true});
+   const state=await build(frame.contentWindow)('KE9ZZ',mode,'KF6UFO');
+   check(name,state.status===expected&&(!reason||state.reason===reason)&&tabClicks===0&&submits===0,`${state.status}${state.reason?' ('+state.reason+')':''}; tab clicks ${tabClicks}; submissions ${submits}`);
+ }
+ const liveShaped=await load(base(kf0wapForm,true,'KF0WAP'));let liveShapedSubmits=0;
+ liveShaped.addEventListener('submit',e=>{e.preventDefault();liveShapedSubmits++;});
+ const liveShapedState=await build(frame.contentWindow,'KF0WAP')('KF0WAP','prepare','KF6UFO');
+ check('live-shaped KF0WAP unsigned form',liveShapedState.status==='unsigned'&&liveShapedState.account==='KF6UFO'&&liveShapedSubmits===0,`${liveShapedState.status}; submissions ${liveShapedSubmits}`);
+ const managedNoWeb=await load(managedBase('',false));let managedSubmits=0;
+ managedNoWeb.addEventListener('submit',e=>{e.preventDefault();managedSubmits++;});
+ const managedNoWebState=await build(frame.contentWindow,'JD1BQP')('JD1BQP','prepare','KF6UFO');
+ check('managed JD1BQP without Web Log is recognized',managedNoWebState.status==='no-web-tab'&&managedNoWebState.account==='KF6UFO'&&managedSubmits===0,managedNoWebState.status);
+ managedNoWeb.querySelector('a[href="#t_bio"]').closest('[role=tab]').setAttribute('aria-selected','false');
+ managedNoWeb.querySelector('#t_bio').setAttribute('aria-hidden','true');
+ managedNoWeb.querySelector('#t_bio').style.display='none';
+ const managedBioState=await build(frame.contentWindow,'JD1BQP')('JD1BQP','bio','KF6UFO');
+ check('managed JD1BQP biography is selected',managedBioState.status==='bio'&&managedNoWeb.querySelector('#t_bio').getAttribute('aria-hidden')==='false'&&managedNoWeb.querySelector('a[href="#t_bio"]').closest('[role=tab]').getAttribute('aria-selected')==='true'&&managedSubmits===0);
+ const managedForm=form.replaceAll('/db/KE9ZZ','/db/JD1BQP');
+ const managedUnsigned=await load(managedBase(managedForm));let managedUnsignedSubmits=0;
+ managedUnsigned.addEventListener('submit',e=>{e.preventDefault();managedUnsignedSubmits++;});
+ const managedUnsignedState=await build(frame.contentWindow,'JD1BQP')('JD1BQP','prepare','KF6UFO');
+ check('managed station unsigned form keeps normal validation',managedUnsignedState.status==='unsigned'&&managedUnsignedState.account==='KF6UFO'&&managedUnsignedSubmits===0,managedUnsignedState.status);
+ for(const [name,mutate] of [
+   ['wrong managed heading cannot sign',doc=>doc.querySelector('.csignmg.hamcall').textContent='JA1BQP'],
+   ['multiple matching station headings cannot sign',doc=>doc.querySelector('#csdata').insertAdjacentHTML('beforeend','<span class="csigns hamcall">JD1BQP</span>')]
+ ]) {
+   const doc=await load(managedBase(managedForm));mutate(doc);let submits=0;
+   doc.addEventListener('submit',e=>{e.preventDefault();submits++;});
+   const state=await build(frame.contentWindow,'JD1BQP')('JD1BQP','sign','KF6UFO');
+   check(name,state.status==='ambiguous'&&state.reason==='station'&&submits===0,`${state.status}${state.reason?' ('+state.reason+')':''}; submissions ${submits}`);
+ }
+ // QRZ selects Web before its asynchronously fetched contact markup arrives.
+ // Waiting for the panel to become visible alone does not make its state ready.
+ const loadingMarkup='<p class="loadingWarn">This may take a moment to load...</p>';
+ for(const [name,loadedMarkup,expected,reason] of [
+   ['waits for delayed unsigned Web Log',form,'unsigned',null],
+   ['waits for delayed already-signed Web Log',confirmation,'already-signed',null],
+   ['delayed conflicting Web Log still stops',form+confirmation,'ambiguous','form-conflict']
+ ]) {
+   const doc=await load(base(loadingMarkup));let delayedSubmits=0,delivered=false;
+   doc.addEventListener('submit',e=>{e.preventDefault();delayedSubmits++;});
+   const pending=build(frame.contentWindow)('KE9ZZ','prepare','KF6UFO');
+   frame.contentWindow.setTimeout(()=>{
+     doc.querySelector('#t_webcon').innerHTML=loadedMarkup;
+     delivered=true;
+   },100);
+   const state=await pending;
+   check(name,delivered&&state.status===expected&&(!reason||state.reason===reason)&&delayedSubmits===0,`${state.status}${state.reason?' ('+state.reason+')':''}; submissions ${delayedSubmits}`);
+ }
+ const loadingInspect=await load(base(loadingMarkup));let loadingClicks=0;
+ loadingInspect.addEventListener('submit',e=>{e.preventDefault();loadingClicks++;});
+ const loadingState=await build(frame.contentWindow)('KE9ZZ','inspect','KF6UFO');
+ check('inspect reports loading Web Log without waiting or signing',loadingState.status==='ambiguous'&&loadingState.reason==='web-loading'&&loadingClicks===0,`${loadingState.status}${loadingState.reason?' ('+loadingState.reason+')':''}; submissions ${loadingClicks}`);
+ const d=await load(base(form));let clicks=0;
+ d.addEventListener('submit',e=>{e.preventDefault();clicks++;d.querySelector('#t_webcon').innerHTML=confirmation;});
+ const run=build(frame.contentWindow); const signed=await run('KE9ZZ','sign','KF6UFO'); const verified=await run('KE9ZZ','prepare','KF6UFO');
+ check('one click followed by verified confirmation',signed.status==='submitted'&&verified.status==='already-signed'&&clicks===1,`${clicks} submission`);
+ const bio=await run('KE9ZZ','bio','KF6UFO');
+ check('bio after successful signature',bio.status==='bio'&&d.querySelector('#t_bio').getAttribute('aria-hidden')==='false'&&d.querySelector('a[href="#t_bio"]').closest('[role=tab]').getAttribute('aria-selected')==='true'&&clicks===1);
+ const guarded=await load(base(form));let guardedClicks=0;
+ guarded.addEventListener('submit',e=>{e.preventDefault();guardedClicks++;});
+ const twice=build(frame.contentWindow);await twice('KE9ZZ','sign','KF6UFO');const again=await twice('KE9ZZ','sign','KF6UFO');
+ check('same-document duplicate guard',guardedClicks===1&&again.status==='ambiguous'&&again.reason==='duplicate',`${guardedClicks} submission`);
+ const noWeb=await load(base('',false));
+ check('bio when station has no Web tab',(await build(frame.contentWindow)('KE9ZZ','bio','KF6UFO')).status==='bio'&&noWeb.querySelector('#t_bio').getAttribute('aria-hidden')==='false');
+ for(const [name,mutate,account='KF6UFO',reason] of [
+   ['wrong station cannot select bio',d=>d.querySelector('.hamcall').textContent='EA4IJS','KF6UFO','station'],
+   ['changed account cannot select bio',null,'W1AW','account-changed'],
+   ['missing bio panel stops navigation',d=>d.querySelector('#t_bio').remove(),'KF6UFO','bio-layout'],
+   ['disabled bio tab stops navigation',d=>d.querySelector('a[href="#t_bio"]').closest('[role=tab]').setAttribute('aria-disabled','true'),'KF6UFO','bio-hidden']
+ ]) {
+   const doc=await load(base(confirmation));mutate?.(doc);let tabClicks=0;
+   doc.querySelector('a[href="#t_bio"]').addEventListener('click',()=>tabClicks++);
+   const state=await build(frame.contentWindow)('KE9ZZ','bio',account);
+   check(name,state.status==='ambiguous'&&state.reason===reason&&tabClicks===0);
+ }
+ const inspectDoc=await load(base(form));inspectDoc.querySelector('a[href="#t_bio"]').click();let inspectClicks=0;
+ inspectDoc.querySelector('a[href="#t_webcon"]').addEventListener('click',()=>inspectClicks++);
+ const inspectState=await build(frame.contentWindow)('KE9ZZ','inspect','KF6UFO');
+ check('inspect does not click tabs or submit',inspectState.status==='unsigned'&&inspectClicks===0&&inspectDoc.querySelector('#t_bio').getAttribute('aria-hidden')==='false');
+ const ambiguousDoc=await load(base(form+confirmation));let ambiguousSubmits=0;
+ ambiguousDoc.addEventListener('submit',e=>{e.preventDefault();ambiguousSubmits++;});
+ const ambiguousState=await build(frame.contentWindow)('KE9ZZ','sign','KF6UFO');
+ check('ambiguous state cannot sign',ambiguousState.status==='ambiguous'&&ambiguousState.reason==='form-conflict'&&ambiguousSubmits===0);
+ output.textContent+=`${passed}/${total} passed`;
+};
+</script>

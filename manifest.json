@@ -1,10 +1,15 @@
 {
   "manifest_version": 3,
   "name": "QRZ Callsign Lookup",
-  "version": "2.0.0",
-  "description": "Right-click a callsign to look it up on QRZ or search your existing QRZ Logbook session.",
+  "version": "2.2.5",
+  "description": "Right-click QRZ confirmation callsigns to sign Web Logs and view biographies, look up callsigns, or search your QRZ Logbook.",
   "permissions": ["contextMenus", "scripting"],
-  "host_permissions": ["https://logbook.qrz.com/*"],
+  "host_permissions": ["https://logbook.qrz.com/*", "https://www.qrz.com/*"],
+  "content_scripts": [{
+    "matches": ["https://forums.qrz.com/index.php*"],
+    "js": ["notifications.js"],
+    "run_at": "document_idle"
+  }],
   "background": {"service_worker": "background.js", "type": "module"},
   "icons": {
     "16": "icons/icon16.png",

@@ -1,2 +1,4 @@
 .DS_Store
 *.zip
+tests/screenshots/
+docs/images/sign-success-*.jpg

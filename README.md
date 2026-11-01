@@ -1,76 +1,78 @@
-# QRZ Callsign Lookup 2.0
+# QRZ Callsign Lookup 2.2.5
 
-Highlight one callsign on a page, right-click, and choose **QRZ**:
+Right-click a station callsign in QRZ confirmation notifications and choose **QRZ → Sign Web Log**. On other pages, highlight one callsign and use the same menu.
 
-- **Lookup Callsign** opens the public QRZ station page in a new tab.
-- **Search My Logbook** reuses a QRZ Logbook tab in any Chrome window, activates it, restores a minimized window, fills the search field, and clicks Find. If no tab exists, it opens the logbook and waits for it. An already open logbook is not reloaded for each search.
+| Web Log state | What happens |
+| --- | --- |
+| Available and unsigned | Adds your signature with an empty comment, verifies QRZ’s confirmation, then displays the biography. |
+| Already signed | Keeps the station tab open on Web and displays “You have already signed CALL’s Web Log.” Nothing is submitted. |
+| No Web Log | Displays the biography with a brief informational message. |
+| Login required or an unfamiliar page | Leaves the station tab open with an explanation. |
+| Signature attempted but confirmation unavailable | Leaves the tab open for review and never retries the signature automatically. |
 
-![QRZ context menu on a highlighted callsign in PSK Reporter](docs/images/qrz-context-menu.png)
+## Install or update
 
-*Right-click a highlighted callsign on a web page to choose **QRZ → Lookup Callsign** or **QRZ → Search My Logbook**.*
+1. [Download the main branch ZIP](https://github.com/kf6ufo/qrz-chrome-extension/archive/refs/heads/main.zip) and extract it into a permanent folder. Alternatively, clone [the repository](https://github.com/kf6ufo/qrz-chrome-extension).
+2. Open `chrome://extensions` in the Chrome profile where you use QRZ and enable **Developer mode**.
+3. Choose **Load unpacked** and select the folder containing `manifest.json`. If an older copy is loaded from another folder, turn it off first.
+4. Accept the requested QRZ site access and sign in to QRZ in that Chrome profile.
+5. Refresh your QRZ notifications page so the confirmation callsigns become links.
 
-## Download the extension
+For an existing installation, replace the files in its current folder with the updated files, then click **Reload** on QRZ Callsign Lookup at `chrome://extensions`. If you cloned the repository, `git pull --ff-only` updates the files before you reload. Keep the extension folder in place; Chrome reads the local files from there. Each Chrome profile needs its own installation. Enable **Allow in incognito** if you want to use it in private windows.
 
-First, save the repository to a permanent folder on your computer. Choose either method:
+## Commands
 
-- **Download ZIP (no Git required):** Open the [GitHub repository](https://github.com/kf6ufo/qrz-chrome-extension), choose **Code → Download ZIP**, and extract the ZIP. Move the extracted `qrz-chrome-extension-main` folder somewhere you want to keep it.
-- **Clone with Git:** Open a terminal in the parent folder where you want to keep the extension, then run:
+- **Sign Web Log** checks the requested station using your current QRZ session and follows the outcomes above. It does not create a QSO or confirm a logbook contact.
+- **Lookup Callsign** opens the station’s public QRZ biography in a new tab in the originating window.
+- **Search My Logbook** fills QRZ’s visible search field and invokes Find. It can reuse and bring forward a Logbook tab from another window in the same normal/incognito context.
 
-  ```sh
-  git clone https://github.com/kf6ufo/qrz-chrome-extension.git
-  ```
+## Signing and tab behavior
 
-The extension folder is the downloaded or cloned folder containing `manifest.json`. Keep it in place after loading it in Chrome; Chrome uses these local files.
+Signing opens one inactive checking tab in the **same Chrome window where you chose the menu**. It does not search other windows for station tabs or repurpose existing tabs. The notifications page stays in place. After the check, the station tab becomes active: Biography is selected after a successful signature or when there is no Web Log; Web stays selected when you already signed it. No tabs are closed by the signing action.
 
-## Load in Chrome
+Repeated requests for the same station in the same window share one pending operation. Different station requests run in order. A closed or moved source tab cancels a queued request. Pending requests do not survive an extension reload or browser restart. The extension does not open tabs on browser startup.
 
-1. Open `chrome://extensions` and turn on **Developer mode**.
-2. If the previous version is already installed from this folder, click its **Reload** button. Otherwise click **Load unpacked** and select the extension folder you downloaded or cloned (the one containing `manifest.json`, not `previous-version/`).
-3. Accept Chrome's requested QRZ Logbook site access. Sign in at https://logbook.qrz.com/logbook using your normal QRZ account.
-4. Highlight `KF6UFO`, right-click, and try each menu item. For logbook reuse, keep the QRZ tab in a second window and try another callsign: the same tab should come forward and show the new search.
+QRZ loads Web Log contents after the Web tab opens. The extension waits for the form or signature confirmation, rather than treating an empty loading panel as a result. It checks parsed station content while unrelated resources may still be loading and can recover once from an interrupted preparation check. These checks never retry a possible signature submission.
 
-## Update an installed copy
+## Callsigns and notifications
 
-If you cloned with Git, open a terminal in your `qrz-chrome-extension` folder and run:
+On QRZ’s [notifications page](https://forums.qrz.com/index.php?account/alerts), confirmation station callsigns become biography links. Your own callsign after `DE` and QRZ’s existing **View** links stay unchanged. Linking runs once per page load and supports paginated notifications. Refresh the page after updating the extension.
 
-```sh
-git pull --ff-only
-```
+Selected callsigns are normalized to uppercase. Surrounding punctuation and portable callsigns such as `EA8/W1AW`, `W1AW/P`, and `W1AW/7` are supported. Prose, multiple callsigns, URLs, and malformed calls are rejected. This checks plausible syntax, not whether a call is licensed.
 
-If you downloaded a ZIP, download and extract the latest ZIP, then copy its contents into the same extension folder, replacing the older files.
+When you use a QRZ biography link, the link identifies the station even if other text remains selected. An unrelated link cannot use stale selected text to authorize a signature.
 
-After either method, open `chrome://extensions` and click **Reload** on QRZ Callsign Lookup.
+## Signature checks
 
-## Callsigns
+The extension requires the exact requested HTTPS station URL and one matching QRZ callsign heading, including QRZ’s managed-station heading style. It identifies your account from QRZ’s account menu beside Logout and checks that the account remains unchanged.
 
-Lowercase is converted to uppercase; surrounding whitespace, quotes, brackets, and common punctuation are removed. Portable and prefixed callsigns stay intact, including `EA8/KF6UFO`, `KF6UFO/P`, and `W1AW/7`. Spaces around a slash are allowed. Internal spaces, prose, multiple callsigns, URLs, and malformed slashes are rejected with a help message. This validates plausible syntax, not whether a station is licensed or listed in QRZ.
+Signing requires QRZ’s Web panel and exactly one POST form back to the same station, the expected hidden inputs, an empty usable comment field, and the enabled `DE YOURCALL` submit control. Existing drafts, changed destinations, unexpected controls, hidden controls, conflicting signature information, and account changes stop the operation.
 
-## Logbook behavior
-
-Search uses the visible `#search` input. It first clicks QRZ's `#findBtn` control, then checks for a search-specific click handler or a nearby Find/Search button. If no button is found, it dispatches Enter with the legacy key code used in the supplied QRZ markup. It never calls a page-global function directly. A successful interaction means the search was submitted; the extension does not inspect or certify QRZ's returned contacts.
-
-The extension waits up to 25 seconds for page navigation and 10 seconds for a visible search input. If login is required, sign in and use the menu again. Requests are not kept after a browser restart or an extension reload. Several quick requests are processed in order. Tabs are reused within the same normal/incognito browsing context; Chrome's **Allow in incognito** setting is needed for private windows.
+All conditions are rechecked immediately before one native submit-button click. Success requires QRZ’s account-specific added-on confirmation. A lost navigation response or missing confirmation never causes another click. Already-signed detection requires the account-specific confirmation without a competing form. Unfamiliar states leave the page open for review.
 
 ## Permissions and privacy
 
-- `contextMenus`: show the two selected-text commands.
-- `scripting`: fill and operate the logbook search after you choose it.
-- `https://logbook.qrz.com/*`: locate and interact with QRZ Logbook tabs.
+- `contextMenus`: adds the callsign commands for selections and links.
+- `scripting`: operates the requested QRZ page and displays feedback.
+- `https://www.qrz.com/*` and `https://logbook.qrz.com/*`: station checks, signing, and Logbook searches.
+- A content script on `https://forums.qrz.com/index.php*`, further restricted in code to notifications: turns confirmation station names into links.
 
-There is no broad `tabs`, `activeTab`, storage, notification, or all-websites permission. Public callsign lookup only opens a URL. No credentials, contacts, or search history are stored by this extension. Selected callsigns go to QRZ when you request a lookup. All code and icons are local, with no third-party libraries or external services.
+The extension uses your existing QRZ session. It does not store credentials or activity history, include analytics, load remote code, or use external libraries. It has no all-sites or broad `tabs` permission. Selected callsigns are sent to QRZ when you request an action; signing submits QRZ’s existing Web Contact form using your session.
 
-## Previous version and verification
+## Verification
 
-`previous-version/` preserves the original version 1.0 manifest and background script, unchanged. To restore it, copy those two files back to this folder and reload the extension in Chrome.
+See [the verification report](tests/RESULTS.md) for coverage and live-check limits.
 
-Version 2.0 has automated checks for callsign handling, menu creation, tab reuse/creation, window activation, load waiting, error handling, and logbook button/Enter interactions. The logbook interaction checks use a local page reproducing the supplied QRZ markup. An authenticated search against your actual QRZ account must be confirmed in Chrome after loading; QRZ can change its page structure.
+Run the background checks with:
 
-Icons: original radio illustration in PNG at 16, 32, 48, and 128 pixels. QRZ is a third-party service; this helper is not an official QRZ product.
+```sh
+node --test tests/background.test.mjs
+```
 
-## Repository overview
+To run the browser fixtures, serve this folder locally, open `tests/weblog.html` and `tests/notifications.html`, and click their test buttons. The fixtures use synthetic accounts and intercept submissions; they do not sign real QRZ Web Logs.
 
-Chrome extension for QRZ.com that adds right-click callsign tools. Look up highlighted callsigns on QRZ or search your personal QRZ Logbook, reusing an existing logbook tab when available. Lightweight, local, and easy to load in Chrome Developer Mode.
+`previous-version/` preserves the original version 1.0 manifest and background script. QRZ may change its layout; unfamiliar layouts stop signing and show the station page for review.
 
 ## License
 
-MIT License. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). This helper is not an official QRZ product.

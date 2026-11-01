@@ -1,0 +1,49 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>QRZ notification callsign tests</title>
+<style>body{font:16px/1.5 system-ui;margin:40px;max-width:1000px}iframe{width:100%;height:220px}pre{white-space:pre-wrap}</style>
+<h1>QRZ notification callsign tests</h1>
+<p>Synthetic notifications only. No requests are sent to QRZ.</p>
+<button id="run">Run notification tests</button>
+<pre id="results">Ready</pre>
+<iframe id="fixture"></iframe>
+<script type="module">
+const source = await (await fetch('../notifications.js')).text();
+const frame = document.querySelector('iframe'), output = document.querySelector('pre');
+const location = {origin:'https://forums.qrz.com', pathname:'/index.php', search:'?account/alerts'};
+const fixture = `<div id="alert123"><h3><strong>QRZ Logbook Confirmation</strong><br>Congratulations!<br>• QSO #1 EI2GN DE KF6UFO, on 2026-10-30 16:53:00 (<a href="https://logbook.qrz.com/logbook?op=show&amp;logid=123">View</a>)<br>• QSO #2 BW2/JP1RIW DE KF6UFO, on 2026-10-30 23:30:00 (<a href="https://logbook.qrz.com/logbook?op=show&amp;logid=124">View</a>)</h3></div>
+<div id="alert124"><h3>QRZ Logbook Confirmation • QSO #1 W1AW/7 DE KF6UFO • QSO #2 ea8/kf6ufo DE KF6UFO</h3></div>
+<div id="alert125"><h3>Forum reply • QSO #1 W1AW DE KF6UFO</h3></div>
+<div id="other"><h3>QRZ Logbook Confirmation • QSO #1 W1AW DE KF6UFO</h3></div>
+<div id="alert126"><h3>QRZ Logbook Confirmation • QSO #1 123 DE KF6UFO • QSO #2 INVALID DE KF6UFO</h3></div>`;
+document.querySelector('#run').onclick = async () => {
+  output.textContent = ''; let passed = 0, total = 0;
+  function check(name, condition) { total++; passed += Boolean(condition); output.textContent += `${condition ? 'PASS' : 'FAIL'} ${name}\n`; }
+  async function load() { const ready = new Promise(resolve => frame.onload = resolve); frame.srcdoc = fixture; await ready; return frame.contentDocument; }
+  const d = await load(), originalText = d.body.textContent;
+  const run = (where = location) => frame.contentWindow.Function('location', source)(where);
+  run();
+  const links = () => [...d.querySelectorAll('[data-qrz-notification-callsign]')];
+  check('four station links, including slash and lowercase callsigns', JSON.stringify(links().map(a=>a.textContent)) === JSON.stringify(['EI2GN','BW2/JP1RIW','W1AW/7','ea8/kf6ufo']));
+  check('encoded station destination', links()[1]?.getAttribute('href') === 'https://www.qrz.com/db/BW2%2FJP1RIW');
+  check('lowercase destination normalized', links()[3]?.getAttribute('href') === 'https://www.qrz.com/db/EA8%2FKF6UFO');
+  check('visible text preserved exactly', d.body.textContent === originalText);
+  check('DE account remains plain text', !links().some(a=>a.textContent === 'KF6UFO'));
+  check('existing View links preserved', d.querySelectorAll('a[href^="https://logbook.qrz.com/"]').length === 2);
+  check('unrelated content remains untouched', !d.querySelector('#alert125 a, #other a, #alert126 a'));
+  run();
+  check('repeat injection is idempotent', links().length === 4 && !d.querySelector('a a'));
+  await load(); run({...location, search:'?account/alerts&page=2'});
+  check('pagination supported', frame.contentDocument.querySelectorAll('[data-qrz-notification-callsign]').length === 4);
+  for (const [name, where] of [
+    ['other forum page', {...location, search:'?threads/example'}],
+    ['lookalike query', {...location, search:'?account/alertsettings'}],
+    ['other origin', {...location, origin:'https://example.org'}],
+    ['other path', {...location, pathname:'/other.php'}]
+  ]) {
+    await load(); run(where);
+    check(name + ' unchanged', frame.contentDocument.querySelectorAll('[data-qrz-notification-callsign]').length === 0);
+  }
+  output.textContent += `${passed}/${total} passed`;
+};
+</script>
