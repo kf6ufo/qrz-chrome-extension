@@ -9,6 +9,8 @@ const build = (win, station='KE9ZZ') => win.Function('fixtureLocation', `return 
 const base = (content, web=true, station='KE9ZZ') => `<div id="qrztop"><ul><li><a href="https://www.qrz.com/db/KF6UFO">KF6UFO page...</a></li><li><a href="https://www.qrz.com/logout/test">Logout</a></li></ul></div><div id="csdata"><span class="csigns hamcall">${station}</span></div><div id="tabs"><ul role="tablist"><li role="tab" aria-selected="${!web}"><a href="#t_bio">Biography</a></li>${web ? '<li role="tab" aria-selected="true"><a href="#t_webcon">Web <span>241</span></a></li>' : ''}</ul><div id="t_bio" aria-hidden="${web}"${web ? ' style="display:none"' : ''}><p>Station biography</p></div>${web ? `<div id="t_webcon" aria-hidden="false">${content}</div>` : ''}</div>`;
 // QRZ uses csignmg instead of csigns for managed station headings such as JD1BQP.
 const managedBase = (content, web=true, station='JD1BQP') => base(content,web,station).replace('class="csigns hamcall"','class="csignmg hamcall"');
+// NH6D uses csignl for its Lifetime Platinum Subscriber station heading.
+const lifetimeBase = (content, web=true, station='NH6D') => base(content,web,station).replace('class="csigns hamcall"','class="csignl hamcall"');
 const form = `<div>Add your Web Contact:<form method="post" action="https://www.qrz.com/db/KE9ZZ"><input type="hidden" name="webcon"><input type="hidden" name="wc_userid"><input type="text" name="wc_comment"><input type="submit" value="DE KF6UFO"></form></div><div id="wclist"></div>`;
 const confirmation = '<p>Your Web Contact, KF6UFO was added on 2026-10-31 18:00:00</p>';
 // Structure inspected on KF0WAP: explanatory paragraph precedes the prompt/form.
@@ -110,6 +112,19 @@ document.querySelector('button').onclick = async () => {
    doc.addEventListener('submit',e=>{e.preventDefault();submits++;});
    const state=await build(frame.contentWindow,'JD1BQP')('JD1BQP','sign','KF6UFO');
    check(name,state.status==='ambiguous'&&state.reason==='station'&&submits===0,`${state.status}${state.reason?' ('+state.reason+')':''}; submissions ${submits}`);
+ }
+ const lifetimeForm=form.replaceAll('/db/KE9ZZ','/db/NH6D');
+ for(const [name,content,web,mode,expected,mutate] of [
+   ['Lifetime Platinum NH6D unsigned Web Log is recognized',lifetimeForm,true,'prepare','unsigned'],
+   ['Lifetime Platinum already-signed Web Log is recognized',confirmation,true,'prepare','already-signed'],
+   ['Lifetime Platinum station without Web Log is recognized','',false,'prepare','no-web-tab'],
+   ['wrong Lifetime Platinum heading cannot sign',lifetimeForm,true,'sign','ambiguous',doc=>doc.querySelector('.csignl.hamcall').textContent='NH6DX'],
+   ['mixed duplicate Lifetime Platinum heading cannot sign',lifetimeForm,true,'sign','ambiguous',doc=>doc.querySelector('#csdata').insertAdjacentHTML('beforeend','<span class="csigns hamcall">NH6D</span>')]
+ ]) {
+   const doc=await load(lifetimeBase(content,web));mutate?.(doc);let submits=0;
+   doc.addEventListener('submit',e=>{e.preventDefault();submits++;});
+   const state=await build(frame.contentWindow,'NH6D')('NH6D',mode,'KF6UFO');
+   check(name,state.status===expected&&submits===0&&(expected==='ambiguous'?state.reason==='station':state.account==='KF6UFO'),`${state.status}${state.reason?' ('+state.reason+')':''}; submissions ${submits}`);
  }
  // QRZ selects Web before its asynchronously fetched contact markup arrives.
  // Waiting for the panel to become visible alone does not make its state ready.

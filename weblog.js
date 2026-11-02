@@ -34,9 +34,9 @@ export async function webLogPage(callsign, mode = "inspect", expectedAccount = n
   const account = accountLinks.length === 1 ? callPath(accountLinks[0].href) : null;
   if (!account) return ambiguous("account-menu");
   if (expectedAccount && account !== expectedAccount) return ambiguous("account-changed");
-  // QRZ uses csignmg for managed callsigns and csigns for other station pages.
-  // Both are authoritative headings within csdata; still require one exact call.
-  const headings = document.querySelectorAll("#csdata .csigns.hamcall, #csdata .csignmg.hamcall");
+  // QRZ uses distinct headings for ordinary, managed, and lifetime-member calls.
+  // Still require one authoritative heading within csdata and an exact call.
+  const headings = document.querySelectorAll("#csdata .csigns.hamcall, #csdata .csignmg.hamcall, #csdata .csignl.hamcall");
   if (callPath(location.href) !== callsign || headings.length !== 1
     || clean(headings[0].textContent).toUpperCase() !== callsign) {
     return ambiguous("station");
@@ -140,7 +140,7 @@ export function showWebLogFeedback(callsign, message) {
   title.textContent = `QRZ · ${callsign}`;
   const version = document.createElement("small");
   version.style.cssText = "font-size:11px;font-weight:400;margin-left:10px";
-  version.textContent = "v2.2.6";
+  version.textContent = "v2.2.7";
   title.append(version);
   const text = document.createElement("p");
   text.textContent = message;
