@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "QRZ Callsign Extension",
-  "version": "2.2.7",
+  "version": "2.2.8",
   "description": "Right-click QRZ confirmation callsigns to sign Web Logs and view biographies, look up callsigns, or search your QRZ Logbook.",
   "permissions": ["contextMenus", "scripting"],
   "host_permissions": ["https://logbook.qrz.com/*", "https://www.qrz.com/*"],

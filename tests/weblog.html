@@ -11,6 +11,8 @@ const base = (content, web=true, station='KE9ZZ') => `<div id="qrztop"><ul><li><
 const managedBase = (content, web=true, station='JD1BQP') => base(content,web,station).replace('class="csigns hamcall"','class="csignmg hamcall"');
 // NH6D uses csignl for its Lifetime Platinum Subscriber station heading.
 const lifetimeBase = (content, web=true, station='NH6D') => base(content,web,station).replace('class="csigns hamcall"','class="csignl hamcall"');
+// Live FK8HA and KC5UZI headers share hamcall but use different styling classes.
+const styledBase = (style, station, content, web=true) => base(content,web,station).replace('class="csigns hamcall"',`class="${style} hamcall"`);
 const form = `<div>Add your Web Contact:<form method="post" action="https://www.qrz.com/db/KE9ZZ"><input type="hidden" name="webcon"><input type="hidden" name="wc_userid"><input type="text" name="wc_comment"><input type="submit" value="DE KF6UFO"></form></div><div id="wclist"></div>`;
 const confirmation = '<p>Your Web Contact, KF6UFO was added on 2026-10-31 18:00:00</p>';
 // Structure inspected on KF0WAP: explanatory paragraph precedes the prompt/form.
@@ -125,6 +127,42 @@ document.querySelector('button').onclick = async () => {
    doc.addEventListener('submit',e=>{e.preventDefault();submits++;});
    const state=await build(frame.contentWindow,'NH6D')('NH6D',mode,'KF6UFO');
    check(name,state.status===expected&&submits===0&&(expected==='ambiguous'?state.reason==='station':state.account==='KF6UFO'),`${state.status}${state.reason?' ('+state.reason+')':''}; submissions ${submits}`);
+ }
+ // Identity comes from QRZ's station marker and exact URL, not its styling tier.
+ const fk8ha=await load(styledBase('csignm','FK8HA','',false));let fk8haSubmits=0;
+ fk8ha.addEventListener('submit',e=>{e.preventDefault();fk8haSubmits++;});
+ const fk8haRun=build(frame.contentWindow,'FK8HA');
+ const fk8haState=await fk8haRun('FK8HA','prepare','KF6UFO');
+ check('live-shaped FK8HA csignm without Web Log is recognized',fk8haState.status==='no-web-tab'&&fk8haState.account==='KF6UFO'&&fk8haSubmits===0,fk8haState.status);
+ fk8ha.querySelector('a[href="#t_bio"]').closest('[role=tab]').setAttribute('aria-selected','false');
+ fk8ha.querySelector('#t_bio').setAttribute('aria-hidden','true');
+ fk8ha.querySelector('#t_bio').style.display='none';
+ const fk8haBio=await fk8haRun('FK8HA','bio','KF6UFO');
+ check('FK8HA csignm biography is selected without submitting',fk8haBio.status==='bio'&&fk8ha.querySelector('#t_bio').getAttribute('aria-hidden')==='false'&&fk8ha.querySelector('a[href="#t_bio"]').closest('[role=tab]').getAttribute('aria-selected')==='true'&&fk8haSubmits===0);
+ const kc5uzi=await load(styledBase('csignz','KC5UZI',confirmation));let kc5uziSubmits=0,kc5uziTabClicks=0;
+ kc5uzi.addEventListener('submit',e=>{e.preventDefault();kc5uziSubmits++;});
+ for(const link of kc5uzi.querySelectorAll('#tabs > ul[role=tablist] a'))link.addEventListener('click',()=>kc5uziTabClicks++);
+ const kc5uziState=await build(frame.contentWindow,'KC5UZI')('KC5UZI','prepare','KF6UFO');
+ check('live-shaped KC5UZI csignz already signed keeps Web selected',kc5uziState.status==='already-signed'&&kc5uziState.account==='KF6UFO'&&kc5uziSubmits===0&&kc5uziTabClicks===0&&kc5uzi.querySelector('a[href="#t_webcon"]').closest('[role=tab]').getAttribute('aria-selected')==='true',`${kc5uziState.status}; submissions ${kc5uziSubmits}; tab clicks ${kc5uziTabClicks}`);
+ for(const [style,station] of [['csignm','FK8HA'],['csignz','KC5UZI']]) {
+   const doc=await load(styledBase(style,station,form.replaceAll('/db/KE9ZZ','/db/'+station)));let submits=0;
+   doc.addEventListener('submit',e=>{e.preventDefault();submits++;doc.querySelector('#t_webcon').innerHTML=confirmation;});
+   const run=build(frame.contentWindow,station);
+   const submitted=await run(station,'sign','KF6UFO');
+   const verified=await run(station,'prepare','KF6UFO');
+   const bio=await run(station,'bio','KF6UFO');
+   check(`${style} unsigned flow submits once, verifies, and selects Biography`,submitted.status==='submitted'&&verified.status==='already-signed'&&bio.status==='bio'&&submits===1&&doc.querySelector('#t_bio').getAttribute('aria-hidden')==='false'&&doc.querySelector('a[href="#t_bio"]').closest('[role=tab]').getAttribute('aria-selected')==='true',`${submits} intercepted submission`);
+ }
+ for(const [name,mutate] of [
+   ['wrong differently styled station heading cannot sign',doc=>doc.querySelector('#csdata .hamcall').textContent='KC5UZJ'],
+   ['mixed csignz and csignm duplicate headings cannot sign',doc=>doc.querySelector('#csdata').insertAdjacentHTML('beforeend','<span class="csignm hamcall">KC5UZI</span>')],
+   ['unrelated body callsign cannot replace a missing station heading',doc=>{doc.querySelector('#csdata .hamcall').remove();doc.body.insertAdjacentHTML('beforeend','<span class="csignz hamcall">KC5UZI</span>');}],
+   ['biography callsign cannot replace a missing station heading',doc=>{doc.querySelector('#csdata .hamcall').remove();doc.querySelector('#t_bio').insertAdjacentHTML('beforeend','<span class="csignm hamcall">KC5UZI</span>');}]
+ ]) {
+   const doc=await load(styledBase('csignz','KC5UZI',form.replaceAll('/db/KE9ZZ','/db/KC5UZI')));mutate(doc);let submits=0;
+   doc.addEventListener('submit',e=>{e.preventDefault();submits++;});
+   const state=await build(frame.contentWindow,'KC5UZI')('KC5UZI','sign','KF6UFO');
+   check(name,state.status==='ambiguous'&&state.reason==='station'&&submits===0,`${state.status}${state.reason?' ('+state.reason+')':''}; submissions ${submits}`);
  }
  // QRZ selects Web before its asynchronously fetched contact markup arrives.
  // Waiting for the panel to become visible alone does not make its state ready.
