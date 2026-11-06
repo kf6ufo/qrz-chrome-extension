@@ -10,7 +10,7 @@ Look up a station, search your QRZ Logbook, or sign a station’s Web Log from C
 | **Search My Logbook** | Searches your QRZ Logbook for contacts with that station. |
 | **Sign Web Log** | Checks the station’s visitor log, adds your signature when needed, and opens the biography afterward. |
 
-On QRZ confirmation notifications, you can right-click the station’s callsign directly. On other pages, highlight one callsign first, then right-click and choose **QRZ**.
+On web pages, such as **QRZ Notifications**, you can right-click or select a station’s callsign and choose **QRZ**.
 
 ![The QRZ right-click menu on a confirmation notification](docs/images/qrz-notifications-menu.jpg)
 
