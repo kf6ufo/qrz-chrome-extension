@@ -68,6 +68,39 @@ document.querySelector('button').onclick = async () => {
    }
    return d;
  }
+ function pendingWidget(doc) {
+   Object.defineProperty(doc,'readyState',{value:'interactive',configurable:true});
+   const list=doc.querySelector('#tabs > ul');
+   list.removeAttribute('role');
+   for(const li of list.querySelectorAll('li')) {
+     li.removeAttribute('role');li.removeAttribute('aria-selected');
+   }
+   for(const panel of doc.querySelectorAll('#tabs > div')) {
+     panel.removeAttribute('role');panel.removeAttribute('aria-hidden');
+   }
+   return () => {
+     list.setAttribute('role','tablist');
+     for(const link of list.querySelectorAll('a')) {
+       const selected=link.getAttribute('href')==='#t_bio',panel=doc.querySelector(link.getAttribute('href'));
+       link.closest('li').setAttribute('role','tab');
+       link.closest('li').setAttribute('aria-selected',String(selected));
+       if(panel) {
+         panel.setAttribute('role','tabpanel');panel.setAttribute('aria-hidden',String(!selected));
+         panel.style.display=selected?'block':'none';
+       }
+     }
+   };
+ }
+ async function retryPreparation(run,station) {
+   const deadline=Date.now()+2000;
+   let state;
+   do {
+     state=await run(station,'prepare','KF6UFO');
+     if(state.status!=='loading')return state;
+     await new Promise(resolve=>setTimeout(resolve,20));
+   } while(Date.now()<deadline);
+   return state;
+ }
  for(const [name,html,expected,mutate,web=true,mode='prepare',account=null] of cases){
    const d=await load(base(html,web)); mutate?.(d); let clicks=0;
    d.addEventListener('submit',e=>{e.preventDefault();clicks++;});
@@ -163,6 +196,46 @@ document.querySelector('button').onclick = async () => {
    doc.addEventListener('submit',e=>{e.preventDefault();submits++;});
    const state=await build(frame.contentWindow,'KC5UZI')('KC5UZI','sign','KF6UFO');
    check(name,state.status==='ambiguous'&&state.reason==='station'&&submits===0,`${state.status}${state.reason?' ('+state.reason+')':''}; submissions ${submits}`);
+ }
+ // Model CE2EP's reported readiness failure by delaying widget roles/ARIA.
+ // Preparation may be retried while that exact structure is pending; signing may not.
+ const lateSigned=await load(base(confirmation,true,'CE2EP'));
+ const initializeSigned=pendingWidget(lateSigned);let lateSignedSubmits=0,earlySignedClicks=0,signedInitialized=false;
+ lateSigned.addEventListener('submit',e=>{e.preventDefault();lateSignedSubmits++;});
+ lateSigned.addEventListener('click',()=>{if(!signedInitialized)earlySignedClicks++;},true);
+ const lateSignedRun=build(frame.contentWindow,'CE2EP');
+ const firstSigned=await lateSignedRun('CE2EP','prepare','KF6UFO');
+ frame.contentWindow.setTimeout(()=>{initializeSigned();signedInitialized=true;},100);
+ const readySigned=await retryPreparation(lateSignedRun,'CE2EP');
+ check('CE2EP waits for delayed widget initialization then recognizes already signed',firstSigned.status==='loading'&&firstSigned.reason==='tabs'&&signedInitialized&&readySigned.status==='already-signed'&&readySigned.account==='KF6UFO'&&lateSignedSubmits===0&&earlySignedClicks===0&&lateSigned.querySelector('a[href="#t_webcon"]').closest('[role=tab]').getAttribute('aria-selected')==='true',`${firstSigned.status} -> ${readySigned.status}; early clicks ${earlySignedClicks}; submissions ${lateSignedSubmits}`);
+ const lateUnsigned=await load(base(form.replaceAll('/db/KE9ZZ','/db/CE2EP'),true,'CE2EP'));
+ const initializeUnsigned=pendingWidget(lateUnsigned);let lateUnsignedSubmits=0,earlyUnsignedClicks=0,unsignedInitialized=false;
+ lateUnsigned.addEventListener('submit',e=>{e.preventDefault();lateUnsignedSubmits++;lateUnsigned.querySelector('#t_webcon').innerHTML=confirmation;});
+ lateUnsigned.addEventListener('click',()=>{if(!unsignedInitialized)earlyUnsignedClicks++;},true);
+ const lateUnsignedRun=build(frame.contentWindow,'CE2EP');
+ const firstUnsigned=await lateUnsignedRun('CE2EP','prepare','KF6UFO');
+ const earlyModes=[];
+ for(const mode of ['sign','inspect','bio'])earlyModes.push(await lateUnsignedRun('CE2EP',mode,'KF6UFO'));
+ check('uninitialized unsigned tabs wait only in prepare and cannot sign or navigate',firstUnsigned.status==='loading'&&firstUnsigned.reason==='tabs'&&earlyModes.every(state=>state.status==='ambiguous'&&state.reason==='tabs')&&lateUnsignedSubmits===0&&earlyUnsignedClicks===0,`${firstUnsigned.status}; other modes ${earlyModes.map(state=>state.status).join(', ')}; clicks ${earlyUnsignedClicks}; submissions ${lateUnsignedSubmits}`);
+ frame.contentWindow.setTimeout(()=>{initializeUnsigned();unsignedInitialized=true;},100);
+ const readyUnsigned=await retryPreparation(lateUnsignedRun,'CE2EP');
+ const beforeSign=lateUnsignedSubmits;
+ const delayedSign=await lateUnsignedRun('CE2EP','sign','KF6UFO');
+ check('unsigned widget readiness permits one later explicit native sign',unsignedInitialized&&readyUnsigned.status==='unsigned'&&readyUnsigned.account==='KF6UFO'&&beforeSign===0&&earlyUnsignedClicks===0&&delayedSign.status==='submitted'&&lateUnsignedSubmits===1,`${readyUnsigned.status}; submissions before sign ${beforeSign}, after sign ${lateUnsignedSubmits}`);
+ for(const [name,mutate] of [
+   ['missing whole station tabs cannot be treated as initializing',doc=>doc.querySelector('#tabs').remove()],
+   ['missing native Biography link cannot be treated as initializing',doc=>doc.querySelector('a[href="#t_bio"]').remove()],
+   ['missing native Biography panel cannot be treated as initializing',doc=>doc.querySelector('#t_bio').remove()],
+   ['wrong raw tab-list role cannot be treated as initializing',doc=>doc.querySelector('#tabs > ul').setAttribute('role','navigation')],
+   ['duplicate raw tab lists cannot be treated as initializing',doc=>doc.querySelector('#tabs').append(doc.querySelector('#tabs > ul').cloneNode(true))],
+   ['duplicate raw Biography links cannot be treated as initializing',doc=>doc.querySelector('#tabs > ul').insertAdjacentHTML('beforeend','<li><a href="#t_bio">Biography</a></li>')],
+   ['duplicate native Biography panels cannot be treated as initializing',doc=>doc.querySelector('#tabs').append(doc.querySelector('#t_bio').cloneNode(true))]
+ ]) {
+   const doc=await load(base(form));pendingWidget(doc);mutate(doc);let submits=0,clicks=0;
+   doc.addEventListener('submit',e=>{e.preventDefault();submits++;});
+   doc.addEventListener('click',()=>clicks++,true);
+   const state=await build(frame.contentWindow)('KE9ZZ','prepare','KF6UFO');
+   check(name,state.status==='ambiguous'&&state.reason==='tabs'&&submits===0&&clicks===0,`${state.status}${state.reason?' ('+state.reason+')':''}; clicks ${clicks}; submissions ${submits}`);
  }
  // QRZ selects Web before its asynchronously fetched contact markup arrives.
  // Waiting for the panel to become visible alone does not make its state ready.

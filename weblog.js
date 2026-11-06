@@ -43,7 +43,21 @@ export async function webLogPage(callsign, mode = "inspect", expectedAccount = n
     return ambiguous("station");
   }
   const tabs = document.querySelector("#tabs > ul[role=tablist]");
-  if (!tabs || !tabs.querySelector('a[href="#t_bio"]')) return ambiguous("tabs");
+  if (!tabs || !tabs.querySelector('a[href="#t_bio"]')) {
+    // HTML parsing can finish before QRZ initializes its tab widget. Only an
+    // intact native tab structure without roles is pending, and only prepare
+    // may ask the caller to wait. Every retry rechecks account and station.
+    const roots = document.querySelectorAll("#tabs");
+    const lists = document.querySelectorAll("#tabs > ul");
+    const bioLinks = lists.length === 1 ? lists[0].querySelectorAll('a[href="#t_bio"]') : [];
+    const bioPanels = document.querySelectorAll("#tabs > #t_bio");
+    if (mode === "prepare" && roots.length === 1 && lists.length === 1
+      && !lists[0].hasAttribute("role") && bioLinks.length === 1
+      && bioLinks[0].parentElement?.parentElement === lists[0] && bioPanels.length === 1) {
+      return result("loading", { reason: "tabs" });
+    }
+    return ambiguous("tabs");
+  }
   if (mode === "bio") {
     const links = tabs.querySelectorAll('a[href="#t_bio"]');
     const panels = document.querySelectorAll("#tabs > #t_bio");
@@ -141,7 +155,7 @@ export function showWebLogFeedback(callsign, message) {
   title.textContent = `QRZ · ${callsign}`;
   const version = document.createElement("small");
   version.style.cssText = "font-size:11px;font-weight:400;margin-left:10px";
-  version.textContent = "v2.2.8";
+  version.textContent = "v2.2.9";
   title.append(version);
   const text = document.createElement("p");
   text.textContent = message;

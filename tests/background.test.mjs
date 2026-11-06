@@ -206,6 +206,56 @@ test('unfinished HTML parsing is polled before recognizing an existing signature
   assert.equal(s.tabs.get(10).active, true);
 });
 
+test('QRZ tab initialization is polled before showing an existing signature', async () => {
+  const s = await setup({ statuses: [
+    { status: 'loading', reason: 'tabs' },
+    { status: 'loading', reason: 'tabs' },
+    'already-signed'
+  ] });
+  const result = await s.module.signWebLog('KE9ZZ', SOURCE);
+  assert.equal(result.status, 'already-signed');
+  assertSigningConfined(s);
+  const checks = runs(s, 'prepare');
+  assert.equal(checks.length, 3);
+  for (let i = 1; i < checks.length; i++) {
+    const between = s.actions.slice(s.actions.indexOf(checks[i - 1]) + 1, s.actions.indexOf(checks[i]));
+    assert.ok(between.some(action => action[0] === 'get' && action[1] === 10),
+      'the work tab is revalidated before each readiness poll');
+  }
+  assert.equal(runs(s, 'sign').length, 0);
+  assert.equal(runs(s, 'bio').length, 0);
+  assert.equal(of(s, 'remove').length, 0);
+  assert.equal(s.tabs.get(10).active, true);
+  assert.match(result.message, /already signed/i);
+});
+
+test('QRZ tab initialization that never finishes stops within the bounded wait and leaves its tab open', async () => {
+  const s = await setup({ statuses: Array.from({ length: 100 }, () => ({ status: 'loading', reason: 'tabs' })) });
+  const result = await s.module.signWebLog('KE9ZZ', SOURCE);
+  assert.equal(result.status, 'ambiguous');
+  assertSigningConfined(s);
+  assert.ok(runs(s, 'prepare').length > 1 && runs(s, 'prepare').length < 100,
+    'the tab-initialization wait must terminate while loading responses remain');
+  assert.equal(runs(s, 'sign').length, 0);
+  assert.equal(runs(s, 'bio').length, 0);
+  assert.equal(of(s, 'remove').length, 0);
+  assert.equal(s.tabs.get(10).active, true);
+  assert.match(result.message, /still loading.*tab has been left open/i);
+});
+
+test('malformed station tabs are terminal and cannot become a signature through retry', async () => {
+  const s = await setup({ statuses: [{ status: 'ambiguous', reason: 'tabs' }, 'unsigned', 'submitted', 'already-signed'] });
+  const result = await s.module.signWebLog('KE9ZZ', SOURCE);
+  assert.equal(result.status, 'ambiguous');
+  assertSigningConfined(s);
+  assert.equal(runs(s, 'prepare').length, 1, 'a rejected layout is not a readiness signal');
+  assert.equal(runs(s, 'sign').length, 0);
+  assert.equal(runs(s, 'bio').length, 0);
+  assert.equal(of(s, 'remove').length, 0);
+  assert.equal(s.tabs.get(10).active, true);
+  assert.match(result.message, /station tabs were not ready/i);
+});
+
 test('one transient prepare-frame error is retried without any sign attempt', async () => {
   const s = await setup({ statuses: [new Error('Frame with ID 0 was removed.'), 'already-signed'] });
   const result = await s.module.signWebLog('KE9ZZ', SOURCE);
