@@ -6,9 +6,9 @@ Look up a station, search your QRZ Logbook, or sign a station’s Web Log from C
 
 | Menu action | What it does |
 | --- | --- |
-| **Lookup Callsign** | Opens the station’s QRZ biography. |
+| **Look Up Their Callsign** | Opens the station’s QRZ biography. |
 | **Search My Logbook** | Searches your QRZ Logbook for contacts with that station. |
-| **Sign Web Log** | Checks the station’s visitor log, adds your signature when needed, and opens the biography afterward. |
+| **Sign Their Web Log** | Checks the station’s visitor log, adds your signature when needed, and opens the biography afterward. |
 
 On web pages, such as **QRZ Notifications**, you can right-click or select a station’s callsign and choose **QRZ**.
 
@@ -18,7 +18,7 @@ On web pages, such as **QRZ Notifications**, you can right-click or select a sta
 
 1. Open your [QRZ notifications](https://forums.qrz.com/index.php?account/alerts).
 2. Right-click a station’s callsign in a confirmation.
-3. Choose **QRZ → Sign Web Log**.
+3. Choose **QRZ → Sign Their Web Log**.
 
 The extension handles the three common outcomes:
 

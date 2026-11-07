@@ -29,9 +29,9 @@ chrome.runtime.onInstalled.addListener(() => {
       return;
     }
     chrome.contextMenus.create({ id: "qrz", title: "QRZ", contexts: ["selection", "link"] });
-    chrome.contextMenus.create({ id: "qrzLookup", parentId: "qrz", title: "Lookup Callsign", contexts: ["selection", "link"] });
+    chrome.contextMenus.create({ id: "qrzLookup", parentId: "qrz", title: "Look Up Their Callsign", contexts: ["selection", "link"] });
     chrome.contextMenus.create({ id: "qrzLogbook", parentId: "qrz", title: "Search My Logbook", contexts: ["selection", "link"] });
-    chrome.contextMenus.create({ id: "qrzWebLog", parentId: "qrz", title: "Sign Web Log", contexts: ["selection", "link"] });
+    chrome.contextMenus.create({ id: "qrzWebLog", parentId: "qrz", title: "Sign Their Web Log", contexts: ["selection", "link"] });
   });
 });
 
@@ -53,11 +53,11 @@ async function waitForLoad(tabId, label = "QRZ Logbook") {
 
 export async function signWebLog(callsign, sourceTab) {
   if (!Number.isInteger(sourceTab?.id) || !Number.isInteger(sourceTab?.windowId)) {
-    throw new Error("Sign Web Log needs the tab where you chose the menu.");
+    throw new Error("Sign Their Web Log needs the tab where you chose the menu.");
   }
   const source = await chrome.tabs.get(sourceTab.id);
   if (source.windowId !== sourceTab.windowId || Boolean(source.incognito) !== Boolean(sourceTab.incognito)) {
-    throw new Error("The original tab moved or closed. Choose Sign Web Log again in its current window.");
+    throw new Error("The original tab moved or closed. Choose Sign Their Web Log again in its current window.");
   }
   const url = "https://www.qrz.com/db/" + encodeURIComponent(callsign);
   const matches = value => {
@@ -83,7 +83,7 @@ export async function signWebLog(callsign, sourceTab) {
     "success": `Signed ${callsign}'s Web Log. QRZ confirmed your Web Contact was added.`,
     "already-signed": `You have already signed ${callsign}'s Web Log.`,
     "no-web-tab": `${callsign} doesn't publish a Web Log. Showing the biography.`,
-    "login-required": "Sign in to QRZ in this Chrome profile, then choose Sign Web Log again. Nothing was submitted.",
+    "login-required": "Sign in to QRZ in this Chrome profile, then choose Sign Their Web Log again. Nothing was submitted.",
     "ambiguous": "The Web Log state could not be verified. Nothing was submitted. Check the Web tab manually.",
     "unconfirmed": "A sign click was attempted, but QRZ's confirmation could not be verified. No automatic retry was made. Check the Web tab before trying again."
   };

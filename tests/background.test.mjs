@@ -112,10 +112,10 @@ function assertSigningConfined(s) {
   assert.equal(s.tabs.get(42).active, false);
 }
 
-test('menu offers Sign Web Log for selected text and station links with minimal permissions', async () => {
+test('menu offers Sign Their Web Log for selected text and station links with minimal permissions', async () => {
   const s = await setup(); s.installed();
   assert.equal(of(s, 'create').length, 0, 'installing/updating registers menus without opening tabs');
-  assert.deepEqual(s.menus.map(menu => menu.title), ['QRZ', 'Lookup Callsign', 'Search My Logbook', 'Sign Web Log']);
+  assert.deepEqual(s.menus.map(menu => menu.title), ['QRZ', 'Look Up Their Callsign', 'Search My Logbook', 'Sign Their Web Log']);
   for (const id of ['qrz', 'qrzWebLog']) {
     assert.ok(s.menus.find(menu => menu.id === id).contexts.includes('selection'));
     assert.ok(s.menus.find(menu => menu.id === id).contexts.includes('link'));
@@ -399,7 +399,7 @@ for (const createdOverrides of [{ windowId: 8 }, { incognito: true }]) {
   });
 }
 
-test('selected text Lookup Callsign still opens the requested station', async () => {
+test('selected text Look Up Their Callsign still opens the requested station', async () => {
   const s = await setup();
   s.clicked({ menuItemId: 'qrzLookup', selectionText: 'ea4ijs' }, SOURCE);
   await settle();

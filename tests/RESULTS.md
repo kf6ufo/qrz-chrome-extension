@@ -1,6 +1,8 @@
-# Verification — QRZ Callsign Extension 2.2.9
+# Verification — QRZ Callsign Extension 2.2.10
 
-Verified November 6, 2026. The verification set contains **126 local checks**.
+Verified November 7, 2026. The verification set contains **126 local checks**.
+
+Version 2.2.10 updates the menu labels and documentation to **Look Up Their Callsign**, **Search My Logbook**, and **Sign Their Web Log**. The notifications screenshot was recaptured after reloading this version, with all three native menu labels visible. Its station lookup, Logbook search, and signing behavior is unchanged.
 
 Version 2.2.9 waits during preparation when QRZ's intact native tab structure is present but its widget has not yet added roles. The existing 25-second preparation limit applies, and every poll revalidates the station and account. Signing never waits or retries a possible submission. Missing, malformed, and duplicate pending tab structures remain validation failures.
 
@@ -8,8 +10,8 @@ Version 2.2.8 introduced the shared callsign marker inside QRZ's native station 
 
 | Check | Result | Latest execution |
 | --- | --- | --- |
-| Background orchestration and menu tests | 48/48 | Rerun for 2.2.9 |
-| Web Log browser fixtures in Chrome | 65/65 | Rerun for 2.2.9 |
+| Background orchestration and menu tests | 48/48 | Rerun for 2.2.10 |
+| Web Log browser fixtures in Chrome | 65/65 | Prior passing run for 2.2.9; signing behavior unchanged |
 | Notification callsign browser fixtures in Chrome | 13/13 | Prior passing run; notification code unchanged |
 
 ## Local coverage
@@ -23,7 +25,7 @@ The background suite simulates Chrome APIs and checks:
 - Page readiness while unrelated resources remain loading, bounded HTML-parsing waits, and one recovery from a transient preparation failure.
 - Delayed tab-widget initialization before an already-signed result, bounded initialization timeouts with tabs left open, and immediate rejection of malformed tabs.
 - No retry for permission or validation failures, no automatic signature retry after a lost response, and preservation of a verified outcome if tab activation fails.
-- Regression coverage for Lookup Callsign and Search My Logbook.
+- Regression coverage for Look Up Their Callsign and Search My Logbook.
 
 The Web Log browser fixtures execute the production page function against synthetic HTML. All submissions are intercepted. They cover all five observed station heading styles; unsigned, already-signed, and no-Web states; identity and destination checks; drafts; unexpected or hidden controls; conflicting signature information; duplicate protection; delayed content; unfinished HTML parsing; and Biography selection. Regressions include FK8HA's no-Web/Biography flow, KC5UZI's already-signed Web state, and single intercepted submissions for both additional styles. Wrong callsigns, mixed duplicate headings, and callsigns found only in body or biography content must stop submission.
 
