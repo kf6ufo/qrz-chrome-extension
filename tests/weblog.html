@@ -290,6 +290,74 @@ document.querySelector('button').onclick = async () => {
  ambiguousDoc.addEventListener('submit',e=>{e.preventDefault();ambiguousSubmits++;});
  const ambiguousState=await build(frame.contentWindow)('KE9ZZ','sign','KF6UFO');
  check('ambiguous state cannot sign',ambiguousState.status==='ambiguous'&&ambiguousState.reason==='form-conflict'&&ambiguousSubmits===0);
+ // Configured comments are plain text and are written only for the final
+ // explicit sign operation. Every submit below is intercepted locally.
+ const greeting='Greetings from Colorado! 73s';
+ const longest=`Greetings from West Virginia - I would be most grateful if you would please log our QSO asap, & add your comment's to my "Web Contact Log" after your visit. Thank you & 73`;
+ for(const [name,comment,nativeLimit] of [
+   ['configured Colorado greeting is submitted once',greeting,null],
+   ['the complete 171-character example fits an equal native limit',longest,171],
+   ['quotes, ampersands, and markup-like text remain literal',`73 & thanks! "Web Contact Log" <strong>hello</strong>`,null]
+ ]) {
+   const doc=await load(base(form)),field=doc.querySelector('[name=wc_comment]');
+   if(nativeLimit!==null)field.maxLength=nativeLimit;
+   let submits=0,events=0,captured=null,guardAtSubmit=false;
+   field.addEventListener('input',()=>events++);field.addEventListener('change',()=>events++);
+   doc.addEventListener('submit',e=>{e.preventDefault();submits++;captured=new FormData(e.target).get('wc_comment');guardAtSubmit=e.target.dataset.qrzSigning==='true';});
+   const state=await build(frame.contentWindow)('KE9ZZ','sign','KF6UFO',comment);
+   check(name,state.status==='submitted'&&submits===1&&captured===comment&&field.value===comment&&events===0&&guardAtSubmit&&!doc.querySelector('#t_webcon strong')&&(nativeLimit!==171||longest.length===171),`${state.status}; submissions ${submits}; characters ${comment.length}`);
+ }
+ for(const mode of ['prepare','inspect','bio']) {
+   const doc=await load(base(form));let submits=0;
+   doc.addEventListener('submit',e=>{e.preventDefault();submits++;});
+   const state=await build(frame.contentWindow)('KE9ZZ',mode,'KF6UFO',greeting);
+   check(`${mode} does not fill or submit the configured comment`,state.status===(mode==='bio'?'bio':'unsigned')&&doc.querySelector('[name=wc_comment]').value===''&&submits===0);
+ }
+ for(const [name,comment] of [
+   ['an overlong configured comment is rejected',longest+'!'],
+   ['a non-string configured comment is rejected',42],
+   ['a null configured comment is rejected',null],
+   ['a multiline configured comment is rejected','Hello\n73']
+ ]) {
+   const doc=await load(base(form));let submits=0;
+   doc.addEventListener('submit',e=>{e.preventDefault();submits++;});
+   const state=await build(frame.contentWindow)('KE9ZZ','sign','KF6UFO',comment);
+   check(name,state.status==='ambiguous'&&state.reason==='comment-setting'&&submits===0&&doc.querySelector('[name=wc_comment]').value==='');
+ }
+ for(const draft of ['Keep my existing draft',greeting]) {
+   const doc=await load(base(form)),field=doc.querySelector('[name=wc_comment]');field.value=draft;let submits=0;
+   doc.addEventListener('submit',e=>{e.preventDefault();submits++;});
+   const state=await build(frame.contentWindow)('KE9ZZ','sign','KF6UFO',greeting);
+   check(draft===greeting?'an existing draft matching the configured comment is still protected':'a different existing draft is never overwritten',state.status==='ambiguous'&&state.reason==='comment-draft'&&field.value===draft&&submits===0&&!doc.querySelector('form').dataset.qrzSigning);
+ }
+ const shortNative=await load(base(form)),shortField=shortNative.querySelector('[name=wc_comment]');shortField.maxLength=greeting.length-1;let shortSubmits=0;
+ shortNative.addEventListener('submit',e=>{e.preventDefault();shortSubmits++;});
+ const shortState=await build(frame.contentWindow)('KE9ZZ','sign','KF6UFO',greeting);
+ check('a shorter station form limit stops signing without truncation',shortState.status==='ambiguous'&&shortState.reason==='comment-length'&&shortField.value===''&&shortSubmits===0);
+ const changedValue=await load(base(form)),changedField=changedValue.querySelector('[name=wc_comment]');let changedSubmits=0;
+ const nativeGetter=Object.getOwnPropertyDescriptor(frame.contentWindow.HTMLInputElement.prototype,'value').get;
+ Object.defineProperty(changedField,'value',{get(){const value=nativeGetter.call(this);return value===''?'':'changed';},configurable:true});
+ changedValue.addEventListener('submit',e=>{e.preventDefault();changedSubmits++;});
+ const changedState=await build(frame.contentWindow)('KE9ZZ','sign','KF6UFO',greeting);
+ check('an unverifiable comment value stops before the submit click',changedState.status==='ambiguous'&&changedState.reason==='comment-value'&&changedSubmits===0);
+ const duplicateComment=await load(base(form));let duplicateSubmits=0;
+ duplicateComment.addEventListener('submit',e=>{e.preventDefault();duplicateSubmits++;});
+ const duplicateRun=build(frame.contentWindow);
+ const commentFirst=await duplicateRun('KE9ZZ','sign','KF6UFO',greeting),commentSecond=await duplicateRun('KE9ZZ','sign','KF6UFO',greeting);
+ check('a repeated configured-comment sign is guarded after one click',commentFirst.status==='submitted'&&commentSecond.status==='ambiguous'&&commentSecond.reason==='duplicate'&&duplicateSubmits===1&&duplicateComment.querySelector('[name=wc_comment]').value===greeting);
+ for(const [name,html,web,expected] of [
+   ['an already-signed station does not receive the configured comment',confirmation,true,'already-signed'],
+   ['a station without a Web Log does not receive the configured comment','',false,'no-web-tab']
+ ]) {
+   const doc=await load(base(html,web));let submits=0;
+   doc.addEventListener('submit',e=>{e.preventDefault();submits++;});
+   const state=await build(frame.contentWindow)('KE9ZZ','sign','KF6UFO',greeting);
+   check(name,state.status===expected&&submits===0&&!doc.querySelector('[name=wc_comment]'));
+ }
+ const wrongStationComment=await load(base(form));wrongStationComment.querySelector('.hamcall').textContent='W1AW';let wrongStationSubmits=0;
+ wrongStationComment.addEventListener('submit',e=>{e.preventDefault();wrongStationSubmits++;});
+ const wrongStationState=await build(frame.contentWindow)('KE9ZZ','sign','KF6UFO',greeting);
+ check('station validation stops before filling the configured comment',wrongStationState.status==='ambiguous'&&wrongStationState.reason==='station'&&wrongStationComment.querySelector('[name=wc_comment]').value===''&&wrongStationSubmits===0);
  output.textContent+=`${passed}/${total} passed`;
 };
 </script>

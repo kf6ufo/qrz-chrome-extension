@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 const source = await readFile(new URL('../background.js', import.meta.url), 'utf8');
 const callsign = await readFile(new URL('../callsign.js', import.meta.url), 'utf8');
+const settingsSource = await readFile(new URL('../settings.js', import.meta.url), 'utf8');
 const SOURCE = { id: 1, windowId: 2, incognito: false };
 let serial = 0;
 let clock = 0;
@@ -15,7 +16,8 @@ async function setup({
   statuses = ['unsigned', 'submitted', 'already-signed'],
   sourceOverrides = {}, sourceMissing = false, createError = null, updateError = null,
   createdOverrides = {}, feedbackError = false, reloadError = null, hook = null, getHook = null, bioStatus = 'bio',
-  logbookStates = ['search'], logbookResult = { ok: true }, logbookOverrides = {}
+  logbookStates = ['search'], logbookResult = { ok: true }, logbookOverrides = {},
+  storedComment = undefined, storageError = null
 } = {}) {
   const actions = [], menus = [];
   let installed, clicked, nextId = 10;
@@ -25,6 +27,11 @@ async function setup({
   const tabs = new Map([[elsewhere.id, elsewhere], [logbook.id, logbook]]);
   if (!sourceMissing) tabs.set(SOURCE.id, sourceTab);
   globalThis.chrome = {
+    storage: { local: { get: async defaults => {
+      actions.push(['settingsRead']);
+      if (storageError) throw storageError;
+      return { ...defaults, ...(storedComment === undefined ? {} : { webLogComment: storedComment }) };
+    } } },
     runtime: {
       onInstalled: { addListener(fn) { installed = fn; } },
       onStartup: { addListener() {} },
@@ -96,6 +103,7 @@ async function setup({
   };
   const stubs = 'function webLogPage(){} function showWebLogFeedback(){} function searchLogbookPage(){} function inspectLogbookPage(){}';
   const script = stubs + callsign.replace('export function', 'function')
+    + settingsSource.replace(/^export /gm, '')
     + source.replace(/^import .*;\n/gm, '')
       .replace(/const sleep = .*;/, 'const sleep = async () => {};')
       .replaceAll('Date.now()', 'testClock()') + `\n// test module ${serial++}`;
@@ -132,7 +140,8 @@ test('menu offers Sign Their Web Log for selected text and station links with mi
   }
   const manifest = JSON.parse(await readFile(new URL('../manifest.json', import.meta.url)));
   assert.equal(manifest.manifest_version, 3);
-  assert.deepEqual(manifest.permissions, ['contextMenus', 'scripting']);
+  assert.deepEqual(manifest.permissions, ['contextMenus', 'scripting', 'storage']);
+  assert.equal(manifest.options_page, 'options.html');
   assert.deepEqual(manifest.host_permissions, ['https://logbook.qrz.com/*', 'https://www.qrz.com/*']);
 });
 
@@ -148,6 +157,44 @@ test('successful signature checks fresh state, clicks once, and shows bio in the
   assert.ok(s.actions.indexOf(runs(s, 'bio')[0]) < s.actions.indexOf(of(s, 'update')[0]));
   assert.equal(of(s, 'remove').length, 0);
 });
+
+test('missing comment setting keeps the default empty signature and reads settings once', async () => {
+  const s = await setup();
+  assert.equal((await s.module.signWebLog('KE9ZZ', SOURCE)).status, 'success');
+  assert.equal(of(s, 'settingsRead').length, 1);
+  assert.ok(of(s, 'webLogPage').every(action => action[4] === ''));
+  assert.equal(runs(s, 'sign').length, 1);
+});
+
+test('one saved comment snapshot is passed through signing even if settings change during preparation', async () => {
+  const comment = 'Greetings from Colorado! 73s';
+  const s = await setup({ storedComment: comment, hook: ({ func, args }) => {
+    if (func.name === 'webLogPage' && args[1] === 'prepare') {
+      chrome.storage.local.get = async () => ({ webLogComment: 'Changed later' });
+    }
+  } });
+  assert.equal((await s.module.signWebLog('KE9ZZ', SOURCE)).status, 'success');
+  assert.equal(of(s, 'settingsRead').length, 1);
+  assert.ok(of(s, 'webLogPage').every(action => action[4] === comment));
+  assert.equal(runs(s, 'sign').length, 1);
+  assertSigningConfined(s);
+});
+
+for (const options of [
+  { storedComment: 'x'.repeat(172) }, { storedComment: null }, { storedComment: 123 },
+  { storedComment: 'Greeting\n73' }, { storageError: new Error('Storage unavailable') }
+]) {
+  test(`invalid or unavailable comment settings stop signing: ${JSON.stringify(options)}`, async () => {
+    const s = await setup(options);
+    const result = await s.module.signWebLog('KE9ZZ', SOURCE);
+    assert.equal(result.status, 'settings-error');
+    assert.match(result.message, /Options.*171.*Nothing was submitted/);
+    assert.equal(of(s, 'webLogPage').length, 0);
+    assert.equal(of(s, 'showWebLogFeedback').length, 1);
+    assert.equal(of(s, 'create').length, 1);
+    assert.equal(s.tabs.get(10).active, true);
+  });
+}
 
 test('fresh unsigned flow succeeds without the reload that could interrupt validation', async () => {
   const s = await setup({ reloadError: new Error('Frame navigation interrupted validation') });

@@ -1,6 +1,7 @@
 import { sanitizeCallsign } from "./callsign.js";
 import { inspectLogbookPage, searchLogbookPage } from "./logbook.js";
 import { webLogPage, showWebLogFeedback } from "./weblog.js";
+import { loadWebLogComment } from "./settings.js";
 
 const LOGBOOK_URL = "https://logbook.qrz.com/logbook";
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -112,12 +113,14 @@ export async function signWebLog(callsign, sourceTab) {
     "no-web-tab": `${callsign} doesn't publish a Web Log. Showing the biography.`,
     "login-required": "Sign in to QRZ in this Chrome profile, then choose Sign Their Web Log again. Nothing was submitted.",
     "ambiguous": "The Web Log state could not be verified. Nothing was submitted. Check the Web tab manually.",
-    "unconfirmed": "A sign click was attempted, but QRZ's confirmation could not be verified. No automatic retry was made. Check the Web tab before trying again."
+    "unconfirmed": "A sign click was attempted, but QRZ's confirmation could not be verified. No automatic retry was made. Check the Web tab before trying again.",
+    "settings-error": "Your saved Web Log comment could not be read or is invalid. Open the extension's Options and save a comment of up to 171 characters, or leave it empty. Then try again. Nothing was submitted."
   };
+  let comment = "";
   const run = async (mode, account = null) => {
     await ownedTab();
     const output = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: webLogPage,
-      args: [callsign, mode, account], injectImmediately: true });
+      args: [callsign, mode, account, comment], injectImmediately: true });
     return output[0]?.result || { status: "ambiguous" };
   };
   const prepareStation = async () => {
@@ -165,6 +168,9 @@ export async function signWebLog(callsign, sourceTab) {
     "form-destination": "The signature form did not lead back to the requested station.",
     "form-fields": "QRZ's signature form contained unexpected controls.",
     "comment-draft": "The comment field contained a draft or could not be used.",
+    "comment-setting": "The configured comment is invalid. Open the extension's Options and save one line of up to 171 characters.",
+    "comment-length": "The configured comment is longer than this station's form allows. Shorten it in the extension's Options before trying again.",
+    "comment-value": "The configured comment could not be entered exactly. Check the comment field manually.",
     "submit-identity": "The signature button did not match your signed-in account.",
     "submit-controls": "The signature button was disabled or changed its destination.",
     "prompt": "QRZ's Add your Web Contact prompt was not recognized.",
@@ -200,6 +206,10 @@ export async function signWebLog(callsign, sourceTab) {
   let attempted = false;
   try {
     await ownedTab();
+    // Read once for this request, so settings cannot change midway through a
+    // signature. A storage error must never silently send an empty comment.
+    try { comment = await loadWebLogComment(); }
+    catch { return await finish("settings-error"); }
     // QRZ's own parsed content is the readiness signal. Slow ads can leave
     // Chrome's tab status loading after the Web Log is already usable.
     let state = await prepareStation();

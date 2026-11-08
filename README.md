@@ -24,13 +24,25 @@ The extension handles the three common outcomes:
 
 | Station’s Web Log | Result |
 | --- | --- |
-| You haven’t signed it | Adds a simple signature with an empty comment, confirms it was added, and displays the station’s biography. |
+| You haven’t signed it | Adds your signature with your saved comment, or an empty comment if none is configured, confirms it was added, and displays the station’s biography. |
 | You already signed it | Leaves the station tab open on Web with an “already signed” message. |
 | The station doesn’t publish one | Displays the biography with a brief informational message. |
 
 Your notifications page stays open. Signing uses a station tab in the same Chrome window where you chose the menu, and leaves that tab open when finished. It uses your existing QRZ sign-in.
 
 A Web Log signature is a visitor greeting. It does not add a QSO or confirm a Logbook contact. If QRZ needs you to sign in or the result cannot be confirmed, the station page stays open with an explanation.
+
+## Configure a Web Log comment
+
+1. Right-click the extension’s toolbar icon and choose **Options**. You can also open `chrome://extensions`, choose **Details** for QRZ Callsign Extension, and select **Extension options**.
+2. Enter an optional, single-line **Web Log comment**, such as `Greetings from Colorado! 73s`.
+3. Click **Save**. Your saved text is included when you next choose **Sign Their Web Log** for an unsigned station.
+
+The limit is **171 characters**, matching the longer example supplied for this feature. The counter shows your character count against this limit. The Colorado greeting is a placeholder, not an automatically saved comment. The default is empty; clear the field and click **Save** to return to signing without a comment.
+
+Your comment is saved locally in this Chrome profile. It is sent to QRZ only when you choose **Sign Their Web Log**. The extension’s new `storage` permission allows it to remember this setting; it does not add site access.
+
+An existing draft in a station’s comment field is left alone. If the station’s form permits fewer characters than your saved comment, the extension stops and explains the problem instead of shortening the text or submitting it.
 
 ## Use it elsewhere
 
@@ -59,13 +71,15 @@ If you cloned [the repository](https://github.com/kf6ufo/qrz-chrome-extension), 
 
 ## Privacy
 
-The extension uses your current QRZ session and sends the requested callsign or Web Log signature to QRZ when you choose an action. It does not store your credentials or activity history, include analytics, or load remote code.
+The extension uses your current QRZ session and sends the requested callsign or Web Log signature to QRZ when you choose an action. Your optional Web Log comment is stored locally in this Chrome profile and included only when signing. It does not store your credentials or activity history, include analytics, or load remote code.
 
 Its site access covers QRZ station pages, QRZ Logbook, and the notifications page. It checks for an existing signature before signing and never automatically repeats a signature when the result is uncertain. Existing draft comments are left alone.
 
 ## For contributors
 
 See the [verification report](tests/RESULTS.md) for test instructions, coverage, and live-check limits.
+
+The configurable-comment flow is covered by local fixtures; no real Web Log signature was submitted to test it.
 
 ## License
 

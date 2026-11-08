@@ -1,7 +1,7 @@
 // Injected by chrome.scripting in the isolated world. Keep dependencies local.
 // inspect is read-only; prepare opens Web; sign rechecks before ONE click;
 // bio selects only QRZ's own Biography tab after a completed outcome.
-export async function webLogPage(callsign, mode = "inspect", expectedAccount = null) {
+export async function webLogPage(callsign, mode = "inspect", expectedAccount = null, comment = "") {
   const result = (status, extra = {}) => ({ status, ...extra });
   // Stable, non-sensitive reasons let the caller explain which check stopped.
   const ambiguous = reason => result("ambiguous", { reason });
@@ -128,6 +128,9 @@ export async function webLogPage(callsign, mode = "inspect", expectedAccount = n
     || new URL(form.action).hash || form.target) return ambiguous("form-destination");
   if (fields.length !== 4 || !hidden("webcon") || !hidden("wc_userid")
     || comments.length !== 1) return ambiguous("form-fields");
+  // Check our own attempt marker before the draft check: our configured text
+  // may still be present after a click whose result has not been confirmed.
+  if (mode === "sign" && form.dataset.qrzSigning) return ambiguous("duplicate");
   if (comments[0].value !== "") return ambiguous("comment-draft");
   if (comments[0].disabled || comments[0].readOnly) return ambiguous("form-fields");
   if (submits.length !== 1 || clean(button.value) !== `DE ${account}`) return ambiguous("submit-identity");
@@ -136,8 +139,19 @@ export async function webLogPage(callsign, mode = "inspect", expectedAccount = n
   if (!/^Add your Web Contact:/.test(clean(form.parentElement.textContent))) return ambiguous("prompt");
   if (mode !== "sign") return result("unsigned", { account });
   if (!visible(button) || !visible(comments[0])) return ambiguous("form-hidden");
-  if (form.dataset.qrzSigning) return ambiguous("duplicate");
+  // This function is serialized for injection, so keep its validation local.
+  // Match settings.js's limit even if called without background validation.
+  if (typeof comment !== "string" || comment.length > 171 || /[\u0000-\u001f\u007f]/.test(comment)) {
+    return ambiguous("comment-setting");
+  }
+  if (comments[0].maxLength >= 0 && comment.length > comments[0].maxLength) return ambiguous("comment-length");
   form.dataset.qrzSigning = "true";
+  if (comment !== "") {
+    try {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(comments[0], comment);
+      if (comments[0].value !== comment || !comments[0].checkValidity()) return ambiguous("comment-value");
+    } catch { return ambiguous("comment-value"); }
+  }
   button.click(); // QRZ's native form submits with the existing signed-in session.
   return result("submitted", { account });
 }
@@ -155,7 +169,7 @@ export function showWebLogFeedback(callsign, message) {
   title.textContent = `QRZ · ${callsign}`;
   const version = document.createElement("small");
   version.style.cssText = "font-size:11px;font-weight:400;margin-left:10px";
-  version.textContent = "v2.2.10";
+  version.textContent = "v2.2.13";
   title.append(version);
   const text = document.createElement("p");
   text.textContent = message;

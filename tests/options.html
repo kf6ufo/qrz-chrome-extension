@@ -1,0 +1,54 @@
+<!doctype html><meta charset="utf-8"><title>QRZ Settings browser tests</title>
+<style>body{font:16px/1.5 system-ui;margin:40px;max-width:1000px}iframe{width:100%;height:750px;border:1px solid #ccd5df}pre{white-space:pre-wrap}</style>
+<h1>QRZ Settings browser tests</h1>
+<p>Uses the production Settings page with simulated storage. Your extension settings and station logs are unchanged.</p>
+<button id="run">Run Settings tests</button><pre id="results">Ready</pre><iframe id="fixture"></iframe>
+<script type="module">
+const frame=document.querySelector('iframe'), output=document.querySelector('pre');
+const html=await (await fetch('../options.html')).text();
+const base=new URL('../',location.href).href;
+const greeting='Greetings from Colorado! 73s';
+const tick=()=>new Promise(resolve=>setTimeout(resolve,0));
+async function load(state={saved:{},writes:[]}) {
+  window.optionsFixture=state;
+  const mock=`window.chrome={storage:{local:{get:async defaults=>{const s=parent.optionsFixture;if(s.failGet)throw Error('Unavailable');return {...defaults,...s.saved};},set:async values=>{const s=parent.optionsFixture;if(s.failSet)throw Error('Unavailable');s.writes.push(values);Object.assign(s.saved,values);}}}};`;
+  const ready=new Promise(resolve=>frame.onload=resolve);
+  frame.srcdoc=html.replace('<head>',`<head><base href="${base}"><script>${mock}<\/script>`);
+  await ready;
+  return frame.contentDocument;
+}
+function enter(doc,value) {
+  const field=doc.querySelector('input');field.value=value;
+  field.dispatchEvent(new frame.contentWindow.Event('input',{bubbles:true}));
+}
+document.querySelector('#run').onclick=async event=>{
+  event.currentTarget.disabled=true;output.textContent='';let passed=0,total=0;
+  const check=(name,ok)=>{total++;passed+=Boolean(ok);output.textContent+=`${ok?'PASS':'FAIL'} ${name}\n`;};
+  try {
+    const state={saved:{},writes:[]};let doc=await load(state);
+    check('missing settings start empty with a 171-character limit',doc.querySelector('input').value===''&&doc.querySelector('input').maxLength===171&&doc.querySelector('output').textContent==='0 / 171'&&state.writes.length===0);
+    enter(doc,greeting);
+    check('typing updates the character counter without saving',doc.querySelector('output').textContent===`${greeting.length} / 171`&&state.writes.length===0);
+    doc.querySelector('#save').click();await tick();
+    check('Save stores the exact greeting and confirms success',state.saved.webLogComment===greeting&&state.writes.length===1&&doc.querySelector('#status').textContent.startsWith('Saved.'));
+    doc=await load(state);
+    check('saved greeting survives reopening Settings',doc.querySelector('input').value===greeting);
+    doc.querySelector('#clear').click();
+    check('Clear waits for Save before changing the stored greeting',doc.querySelector('input').value===''&&state.saved.webLogComment===greeting);
+    doc.querySelector('#save').click();await tick();
+    check('saving an empty comment restores signatures without a comment',state.saved.webLogComment===''&&state.writes.length===2);
+    const invalid={saved:{webLogComment:'x'.repeat(172)},writes:[]};doc=await load(invalid);
+    check('overlong saved text is shown in full for correction',doc.querySelector('input').value.length===172&&doc.querySelector('#save').disabled&&doc.querySelector('#status').textContent.includes('needs correction'));
+    doc.querySelector('form').dispatchEvent(new frame.contentWindow.Event('submit',{cancelable:true}));await tick();
+    check('invalid text cannot be saved programmatically',invalid.writes.length===0);
+    const failing={saved:{webLogComment:greeting},writes:[],failSet:true};doc=await load(failing);enter(doc,'New greeting');doc.querySelector('#save').click();await tick();
+    check('save failures preserve the prior setting and report an error',failing.saved.webLogComment===greeting&&doc.querySelector('#status').classList.contains('error')&&!doc.querySelector('#save').disabled);
+    doc=await load({saved:{},writes:[],failGet:true});
+    check('load failures disable changes instead of silently replacing settings',doc.querySelector('input').disabled&&doc.querySelector('#save').disabled&&doc.querySelector('#status').textContent.includes('could not be loaded'));
+    // Leave a useful preview without changing any real extension setting.
+    doc=await load({saved:{webLogComment:greeting},writes:[]});
+  } catch(error) {check('runner completed',false);output.textContent+=error.message+'\n';}
+  output.textContent+=`${passed}/${total} passed`;
+  document.querySelector('#run').disabled=false;
+};
+</script>

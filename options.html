@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QRZ Callsign Extension — Settings</title>
+  <link rel="icon" href="icons/icon32.png">
+  <link rel="stylesheet" href="options.css">
+  <script type="module" src="options.js"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <img src="icons/icon128.png" width="64" height="64" alt="">
+      <div><p class="eyebrow">QRZ Callsign Extension</p><h1>Settings</h1></div>
+    </header>
+    <section aria-labelledby="comment-heading">
+      <h2 id="comment-heading">A greeting for their Web Log</h2>
+      <p>Save a short message to include when you choose <strong>Sign Their Web Log</strong>.</p>
+      <form id="settings-form">
+        <label for="web-log-comment">Web Log comment <span>(optional)</span></label>
+        <input id="web-log-comment" name="webLogComment" type="text" placeholder="Greetings from Colorado! 73s" aria-describedby="comment-help comment-count" autocomplete="off" disabled>
+        <div class="field-meta"><p id="comment-help">One line. Leave empty to sign without a comment.</p><output id="comment-count" for="web-log-comment">0 / 171</output></div>
+        <div class="actions"><button type="submit" id="save" disabled>Save</button><button type="button" id="clear" class="secondary" disabled>Clear</button></div>
+        <p id="status" role="status" aria-live="polite">Loading saved comment…</p>
+      </form>
+    </section>
+    <p class="privacy">Your comment is saved only in this Chrome profile and sent to QRZ when you choose Sign Their Web Log. Saving it here does not sign a station’s log.</p>
+  </main>
+</body>
+</html>
