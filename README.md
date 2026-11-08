@@ -32,6 +32,8 @@ Your notifications page stays open. Signing uses a station tab in the same Chrom
 
 A Web Log signature is a visitor greeting. It does not add a QSO or confirm a Logbook contact. If QRZ needs you to sign in or the result cannot be confirmed, the station page stays open with an explanation.
 
+If QRZ redirects an old callsign to a different station (for example, PU2UTY to PY2UTY), the extension checks the destination without signing. If the destination has no Web Log, it displays the biography and explains the redirect. If it has a Web Log or the state is uncertain, it leaves the station open for manual review. It never automatically signs a different callsign.
+
 ## Use it elsewhere
 
 For **Look Up Their Callsign** or **Search My Logbook**, right-click a QRZ biography link, including the callsign links on QRZ QSO pages, or a callsign link on the **PSKReporter map**. No highlighting is needed. A recognized station link takes precedence over any text already highlighted.
