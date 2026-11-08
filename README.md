@@ -32,18 +32,6 @@ Your notifications page stays open. Signing uses a station tab in the same Chrom
 
 A Web Log signature is a visitor greeting. It does not add a QSO or confirm a Logbook contact. If QRZ needs you to sign in or the result cannot be confirmed, the station page stays open with an explanation.
 
-## Configure a Web Log comment
-
-1. Right-click the extension’s toolbar icon and choose **Options**. You can also open `chrome://extensions`, choose **Details** for QRZ Callsign Extension, and select **Extension options**.
-2. Enter an optional, single-line **Web Log comment**, such as `Greetings from Colorado! 73s`.
-3. Click **Save**. Your saved text is included when you next choose **Sign Their Web Log** for an unsigned station.
-
-The limit is **171 characters**, matching the longer example supplied for this feature. The counter shows your character count against this limit. The Colorado greeting is a placeholder, not an automatically saved comment. The default is empty; clear the field and click **Save** to return to signing without a comment.
-
-Your comment is saved locally in this Chrome profile. It is sent to QRZ only when you choose **Sign Their Web Log**. The extension’s new `storage` permission allows it to remember this setting; it does not add site access.
-
-An existing draft in a station’s comment field is left alone. If the station’s form permits fewer characters than your saved comment, the extension stops and explains the problem instead of shortening the text or submitting it.
-
 ## Use it elsewhere
 
 For **Look Up Their Callsign** or **Search My Logbook**, right-click a QRZ biography link, including the callsign links on QRZ QSO pages, or a callsign link on the **PSKReporter map**. No highlighting is needed. A recognized station link takes precedence over any text already highlighted.
@@ -53,6 +41,27 @@ On other pages or links, highlight one complete callsign, right-click, and choos
 For **Sign Their Web Log**, right-click a callsign in QRZ Notifications or a biography link beginning with `https://www.qrz.com/db/`. You can also highlight a callsign in plain text and right-click it.
 
 **Search My Logbook** brings an existing QRZ Logbook tab forward, including one in another Chrome window. If that tab is showing QSO details, it reopens the main Logbook in the same tab before searching. If no Logbook tab is open, it opens one for you.
+
+## Configuration
+
+Save an optional greeting to include with new Web Log signatures:
+
+1. Right-click the extension’s toolbar icon and choose **Options**. You can also open `chrome://extensions`, choose **Details** for QRZ Callsign Extension, and select **Extension options**.
+2. Enter a single-line **Web Log comment**. For example:
+
+   ```text
+   Greetings from SW Colorado, where even the mule deer have impressive antenna arrays. 73 from KF6UFO!
+   ```
+
+3. Click **Save**. Your greeting is included when you next choose **Sign Their Web Log** for an unsigned station.
+
+![QRZ extension Settings showing the example Web Log greeting, character counter, and Save and Clear buttons](docs/images/qrz-configuration.jpg)
+
+Comments can contain up to **171 characters**; the live counter shows your character count against that limit. The default is empty. To sign without a comment again, click **Clear**, then **Save**.
+
+Your comment is saved locally in this Chrome profile and sent to QRZ only when you choose **Sign Their Web Log**. Saving a comment does not sign a station’s log.
+
+Existing drafts in a station’s comment field are left alone. If a station’s form allows fewer characters than your saved greeting, the extension stops and explains the problem instead of shortening the text or submitting it.
 
 ## Install
 
