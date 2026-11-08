@@ -10,16 +10,43 @@ let logbookQueue = Promise.resolve();
 let webLogQueue = Promise.resolve();
 const pendingWebLogs = new Set();
 
-// A link context must identify its own station; stale selected text must never
-// cause a signature for a different station.
-export function menuCallsign(info) {
-  if (!info.linkUrl) return sanitizeCallsign(info.selectionText);
+function stationLinkCallsign(linkUrl, readOnly) {
   try {
-    const url = new URL(info.linkUrl);
-    if (url.origin !== "https://www.qrz.com" || url.search || url.hash) return null;
+    const url = new URL(linkUrl);
+    // QRZ's QSO details still use http links. Read only the station identifier;
+    // every action opens our canonical HTTPS destination, never the source URL.
+    const stationHost = readOnly
+      ? ["http:", "https:"].includes(url.protocol)
+        && ["qrz.com", "www.qrz.com"].includes(url.host)
+        && !url.username && !url.password
+      : url.origin === "https://www.qrz.com";
+    if (!stationHost || url.search || url.hash) return null;
     const match = url.pathname.match(/^\/db\/(.+?)\/?$/i);
     return match ? sanitizeCallsign(decodeURIComponent(match[1])) : null;
   } catch { return null; }
+}
+
+function pskReporterLinkCallsign(info) {
+  try {
+    const page = new URL(info.frameUrl || info.pageUrl);
+    if (!["http:", "https:"].includes(page.protocol)
+        || !["pskreporter.info", "www.pskreporter.info"].includes(page.host)
+        || !/^\/pskmap(?:\.html)?$/.test(page.pathname)) return null;
+    // PSKReporter's map callsigns change its map filter. Parse only the two
+    // observed literal formats; never execute JavaScript from a link.
+    const match = info.linkUrl.match(/^javascript:\s*showAndSet(?:Rx)?Callsign\(\s*(['"])([A-Za-z0-9/]+)\1\s*\)\s*;?\s*$/);
+    return match ? sanitizeCallsign(match[2]) : null;
+  } catch { return null; }
+}
+
+export function menuCallsign(info) {
+  if (!info.linkUrl) return sanitizeCallsign(info.selectionText);
+  const readOnly = ["qrzLookup", "qrzLogbook"].includes(info.menuItemId);
+  const station = stationLinkCallsign(info.linkUrl, readOnly);
+  if (station) return station;
+  // A signature's link must identify its own station. A leftover selection on
+  // an unrelated link can be used for a lookup, but must never cause signing.
+  return readOnly ? pskReporterLinkCallsign(info) || sanitizeCallsign(info.selectionText) : null;
 }
 
 chrome.runtime.onInstalled.addListener(() => {

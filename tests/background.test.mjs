@@ -407,6 +407,121 @@ test('selected text Look Up Their Callsign still opens the requested station', a
   assert.equal(of(s, 'create')[0][1].windowId, 2);
 });
 
+const linkedCallsigns = [
+  { label: 'QRZ QSO HTTP link', linkUrl: 'http://www.qrz.com/db/JE4YMO', expected: 'JE4YMO' },
+  { label: 'QRZ bare hostname', linkUrl: 'https://qrz.com/db/EA8%2FKF6UFO', expected: 'EA8/KF6UFO' },
+  { label: 'QRZ HTTP portable link', linkUrl: 'http://qrz.com/db/KF6UFO/P/', expected: 'KF6UFO/P' },
+  { label: 'PSKReporter transmitter', pageUrl: 'https://pskreporter.info/pskmap.html',
+    linkUrl: "javascript:showAndSetCallsign('KF6UFO')", expected: 'KF6UFO' },
+  { label: 'PSKReporter receiver', pageUrl: 'https://pskreporter.info/pskmap.html',
+    linkUrl: "javascript:showAndSetRxCallsign('TF1FT')", expected: 'TF1FT' },
+  { label: 'PSKReporter portable and double quotes', pageUrl: 'https://pskreporter.info/pskmap',
+    linkUrl: 'javascript:showAndSetRxCallsign( "ea8/kf6ufo" );', expected: 'EA8/KF6UFO' },
+  { label: 'PSKReporter frame', frameUrl: 'https://pskreporter.info/pskmap.html',
+    pageUrl: 'https://example.org/', linkUrl: "javascript:showAndSetCallsign('KF6UFO/P')", expected: 'KF6UFO/P' }
+];
+
+for (const menuItemId of ['qrzLookup', 'qrzLogbook']) {
+  for (const { label, expected, ...info } of linkedCallsigns) {
+    test(`${menuItemId} resolves ${label} without selecting text or running the link`, async () => {
+      const s = await setup();
+      s.clicked({ menuItemId, ...info }, SOURCE);
+      await settle();
+      if (menuItemId === 'qrzLookup') {
+        assert.deepEqual(of(s, 'create').map(action => action[1]), [{
+          url: 'https://www.qrz.com/db/' + encodeURIComponent(expected), active: true, windowId: 2
+        }]);
+        assert.equal(of(s, 'searchLogbookPage').length, 0);
+      } else {
+        assert.equal(of(s, 'create').length, 0, 'the existing Logbook tab is reused');
+        assert.deepEqual(of(s, 'searchLogbookPage').map(action => action.slice(1)), [
+          [expected, { targetTabId: 50, injectImmediately: undefined }]
+        ]);
+      }
+      assert.equal(of(s, 'webLogPage').length, 0, 'read-only actions cannot start signing');
+      assert.equal(of(s, 'update').filter(action => action[1] === SOURCE.id).length, 0,
+        'the source map or QSO page is not navigated');
+    });
+  }
+
+  test(`${menuItemId} uses one highlighted callsign on an unrecognized link`, async () => {
+    const s = await setup();
+    s.clicked({ menuItemId, selectionText: '(ea8 / kf6ufo / p)',
+      linkUrl: 'https://example.org/station?id=123' }, SOURCE);
+    await settle();
+    if (menuItemId === 'qrzLookup') {
+      assert.equal(of(s, 'create')[0][1].url, 'https://www.qrz.com/db/EA8%2FKF6UFO%2FP');
+    } else {
+      assert.equal(of(s, 'create').length, 0);
+      assert.equal(of(s, 'searchLogbookPage')[0][1], 'EA8/KF6UFO/P');
+    }
+    assert.equal(of(s, 'webLogPage').length, 0);
+  });
+
+  test(`${menuItemId} prefers an identified link station over leftover selection`, async () => {
+    const s = await setup();
+    for (const { expected, label, ...info } of linkedCallsigns) {
+      assert.equal(s.module.menuCallsign({ menuItemId, ...info, selectionText: 'W1AW' }), expected, label);
+    }
+  });
+
+  for (const selectionText of [undefined, 'KF6UFO W1AW', 'please look up KF6UFO', 'not a callsign']) {
+    test(`${menuItemId} rejects an unknown link with invalid selection: ${selectionText}`, async () => {
+      const s = await setup();
+      s.clicked({ menuItemId, linkUrl: 'https://example.org/', selectionText }, SOURCE);
+      await settle();
+      assert.equal(of(s, 'create').length, 1);
+      assert.match(of(s, 'create')[0][1].url, /^chrome-extension:\/\/test\/help\.html#/);
+      assert.equal(of(s, 'searchLogbookPage').length, 0);
+      assert.equal(of(s, 'webLogPage').length, 0);
+    });
+  }
+}
+
+test('PSKReporter link parsing rejects unrelated pages, frames, and executable expressions', async () => {
+  const s = await setup();
+  const valid = { menuItemId: 'qrzLookup', pageUrl: 'https://pskreporter.info/pskmap.html',
+    linkUrl: "javascript:showAndSetCallsign('KF6UFO')" };
+  for (const pageUrl of [undefined, 'https://example.org/pskmap.html',
+    'https://pskreporter.info.evil.test/pskmap.html', 'https://pskreporter.info/other.html']) {
+    assert.equal(s.module.menuCallsign({ ...valid, pageUrl }), null, String(pageUrl));
+  }
+  assert.equal(s.module.menuCallsign({ ...valid, frameUrl: 'https://example.org/pskmap.html' }), null,
+    'an unrelated frame cannot inherit the top page URL');
+  for (const linkUrl of [
+    "javascript:showAndSetCallsign('KF6UFO');alert(1)",
+    "javascript:showAndSetCallsign('KF6UFO', 'W1AW')",
+    "javascript:showAndSetCallsign('KF6UFO' + '/P')",
+    "javascript:showAndSetCallsign('KF6UFO W1AW')",
+    "javascript:otherFunction('KF6UFO')",
+    "javascript:showAndSetCallsign('KF6UFO\")"
+  ]) {
+    assert.equal(s.module.menuCallsign({ ...valid, linkUrl }), null, linkUrl);
+  }
+});
+
+test('read-only QRZ link parsing rejects lookalike hosts, credentials, and ambiguous URLs', async () => {
+  const s = await setup();
+  for (const menuItemId of ['qrzLookup', 'qrzLogbook']) {
+    for (const linkUrl of ['https://www.qrz.com.evil.test/db/KE9ZZ', 'https://qrz.com:8443/db/KE9ZZ',
+      'https://user:pass@www.qrz.com/db/KE9ZZ', 'https://www.qrz.com/logout/KE9ZZ',
+      'https://www.qrz.com/db/KE9ZZ?other=W1AW', 'https://www.qrz.com/db/%ZZ',
+      'https://www.qrz.com/db/KE9ZZ#W1AW']) {
+      assert.equal(s.module.menuCallsign({ menuItemId, linkUrl }), null, linkUrl);
+    }
+  }
+});
+
+test('new read-only link formats cannot cause signing with a stale selection', async () => {
+  const s = await setup();
+  for (const { expected, label, ...info } of linkedCallsigns) {
+    s.clicked({ menuItemId: 'qrzWebLog', ...info, selectionText: 'W1AW' }, SOURCE);
+  }
+  await settle();
+  assert.equal(of(s, 'create').length, 0);
+  assert.equal(of(s, 'webLogPage').length, 0);
+});
+
 test('QRZ station link takes precedence over stale selection', async () => {
   const s = await setup({ statuses: ['already-signed'] });
   s.clicked({ menuItemId: 'qrzWebLog', linkUrl: 'https://www.qrz.com/db/KE9ZZ', selectionText: 'W1AW' }, SOURCE);

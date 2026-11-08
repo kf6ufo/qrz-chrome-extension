@@ -10,7 +10,7 @@ Look up a station, search your QRZ Logbook, or sign a station’s Web Log from C
 | **Search My Logbook** | Searches your QRZ Logbook for contacts with that station. |
 | **Sign Their Web Log** | Checks the station’s visitor log, adds your signature when needed, and opens the biography afterward. |
 
-On web pages, such as **QRZ Notifications**, you can right-click or select a station’s callsign and choose **QRZ**.
+On **QRZ Notifications**, right-click a station’s callsign and choose an action under **QRZ**.
 
 ![The QRZ right-click menu on a confirmation notification](docs/images/qrz-notifications-menu.jpg)
 
@@ -34,7 +34,11 @@ A Web Log signature is a visitor greeting. It does not add a QSO or confirm a Lo
 
 ## Use it elsewhere
 
-Highlight a single callsign on another page, right-click, and choose an action under **QRZ**. Lowercase and portable callsigns such as `EA8/W1AW`, `W1AW/P`, and `W1AW/7` are supported.
+For **Look Up Their Callsign** or **Search My Logbook**, right-click a QRZ biography link, including the callsign links on QRZ QSO pages, or a callsign link on the **PSKReporter map**. No highlighting is needed. A recognized station link takes precedence over any text already highlighted.
+
+On other pages or links, highlight one complete callsign, right-click, and choose **Look Up Their Callsign** or **Search My Logbook**. Lowercase and portable callsigns such as `EA8/W1AW`, `W1AW/P`, and `W1AW/7` are supported.
+
+For **Sign Their Web Log**, right-click a callsign in QRZ Notifications or a biography link beginning with `https://www.qrz.com/db/`. You can also highlight a callsign in plain text and right-click it.
 
 **Search My Logbook** brings an existing QRZ Logbook tab forward, including one in another Chrome window. If no Logbook tab is open, it opens one for you.
 

@@ -1,6 +1,8 @@
-# Verification — QRZ Callsign Extension 2.2.10
+# Verification — QRZ Callsign Extension 2.2.11
 
-Verified November 7, 2026. The verification set contains **126 local checks**.
+Updated November 8, 2026. The verification set contains **155 local checks**. All **77 background checks** passed for 2.2.11; the unchanged browser fixtures retain their prior passing results below.
+
+Version 2.2.11 fixes **Look Up Their Callsign** and **Search My Logbook** for the linked callsigns observed on QRZ QSO details and PSKReporter. QRZ's HTTP station URLs are parsed and converted into canonical HTTPS destinations. PSKReporter's two map callsign link formats are parsed as literal text, without executing their JavaScript. A recognized station link takes precedence over selected text; otherwise, one valid selected callsign can be used on other links. Web Log signing retains its existing link validation and never falls back to a leftover selection on an unrecognized link. No permissions were added.
 
 Version 2.2.10 updates the menu labels and documentation to **Look Up Their Callsign**, **Search My Logbook**, and **Sign Their Web Log**. The notifications screenshot was recaptured after reloading this version, with all three native menu labels visible. Its station lookup, Logbook search, and signing behavior is unchanged.
 
@@ -10,7 +12,7 @@ Version 2.2.8 introduced the shared callsign marker inside QRZ's native station 
 
 | Check | Result | Latest execution |
 | --- | --- | --- |
-| Background orchestration and menu tests | 48/48 | Rerun for 2.2.10 |
+| Background orchestration and menu tests | 77/77 | Rerun for 2.2.11 |
 | Web Log browser fixtures in Chrome | 65/65 | Prior passing run for 2.2.9; signing behavior unchanged |
 | Notification callsign browser fixtures in Chrome | 13/13 | Prior passing run; notification code unchanged |
 
@@ -26,6 +28,10 @@ The background suite simulates Chrome APIs and checks:
 - Delayed tab-widget initialization before an already-signed result, bounded initialization timeouts with tabs left open, and immediate rejection of malformed tabs.
 - No retry for permission or validation failures, no automatic signature retry after a lost response, and preservation of a verified outcome if tab activation fails.
 - Regression coverage for Look Up Their Callsign and Search My Logbook.
+- Direct lookup and Logbook search for the observed HTTP QRZ QSO link, QRZ hostname variants, portable callsigns, and both PSKReporter map callsign functions without highlighted text.
+- Valid selection fallback on unrecognized links, rejection of invalid selections, and recognized-link precedence over stale selection.
+- PSKReporter source/frame validation and rejection of appended JavaScript, extra arguments, expressions, mismatched quotes, and unrelated functions. QRZ lookalike hosts, credentials, nonstandard ports, malformed encoding, queries, and fragments remain rejected without a valid selection.
+- All newly supported read-only link formats remain unable to trigger signing using stale selected text.
 
 The Web Log browser fixtures execute the production page function against synthetic HTML. All submissions are intercepted. They cover all five observed station heading styles; unsigned, already-signed, and no-Web states; identity and destination checks; drafts; unexpected or hidden controls; conflicting signature information; duplicate protection; delayed content; unfinished HTML parsing; and Biography selection. Regressions include FK8HA's no-Web/Biography flow, KC5UZI's already-signed Web state, and single intercepted submissions for both additional styles. Wrong callsigns, mixed duplicate headings, and callsigns found only in body or biography content must stop submission.
 
@@ -34,6 +40,10 @@ Delayed-widget fixtures start with parsed native markup before roles and ARIA st
 The notification fixtures cover QRZ’s line-break formatting, multiple and portable callsigns, pagination, unchanged View links and account callsigns, unrelated pages, and idempotent linking.
 
 ## Live validation and limits
+
+On November 8, read-only inspection of the user's open pages confirmed that QRZ QSO details linked JE4YMO with `http://www.qrz.com/db/JE4YMO`, while PSKReporter's map linked KF6UFO and TF1FT with `javascript:showAndSetCallsign('KF6UFO')` and `javascript:showAndSetRxCallsign('TF1FT')`. The new regressions use these exact formats. Chrome's [context-menu API](https://developer.chrome.com/docs/extensions/reference/api/contextMenus#type-OnClickData) supplies a link URL and any selected text, rather than the link's displayed callsign. The previous resolver rejected both formats and ignored selected text whenever a link URL was present.
+
+The installed extension was not reloaded during this check: browser security blocked navigation to Chrome's extension settings. A live menu retry with 2.2.11 remains for the user after reloading. No live Logbook searches or signatures were submitted during this investigation.
 
 The user confirmed a complete unsigned-to-signed flow in version 2.2.2: QRZ displayed the account-specific added-on confirmation and the extension selected Biography. Version 2.2.5 retains that signing flow, but a fresh unsigned live submission was not repeated for 2.2.5.
 
