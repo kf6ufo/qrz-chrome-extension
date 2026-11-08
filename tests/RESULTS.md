@@ -1,4 +1,8 @@
-# Verification — QRZ Callsign Extension 2.2.13
+# Verification — QRZ Callsign Extension 2.2.14
+
+Version 2.2.14 adds read-only inspection of QRZ callsign redirects, motivated by PU2UTY resolving to PY2UTY. If the destination has no Web Log, the extension reports the redirect and opens Biography. If a different callsign has a Web Log or verification fails, it never submits a signature. Only explicit QRZ login redirects are labeled login-required; unknown destinations are ambiguous. Six new background regression cases were added but have not yet been executed in this environment. **The passing totals below are from 2.2.13, not a claimed 2.2.14 test run.**
+
+## Previous verification (2.2.13)
 
 Updated November 8, 2026. The verification set contains **229 local checks**. All **95 background checks**, **14 settings checks**, **83 Web Log browser checks**, and **10 Settings browser checks** passed for 2.2.13 (**202 current checks**). The unchanged Logbook and notification browser fixtures retain their prior passing results below.
 
