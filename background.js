@@ -1,5 +1,5 @@
 import { sanitizeCallsign } from "./callsign.js";
-import { searchLogbookPage } from "./logbook.js";
+import { inspectLogbookPage, searchLogbookPage } from "./logbook.js";
 import { webLogPage, showWebLogFeedback } from "./weblog.js";
 
 const LOGBOOK_URL = "https://logbook.qrz.com/logbook";
@@ -257,6 +257,32 @@ export async function searchLogbook(callsign, sourceTab) {
   }
   if (!tab.url || new URL(tab.url).origin !== "https://logbook.qrz.com") {
     throw new Error("Sign in to QRZ in the opened tab, open your Logbook, then select Search My Logbook again.");
+  }
+  const inspect = async () => {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id }, func: inspectLogbookPage, injectImmediately: true
+    });
+    return results[0]?.result;
+  };
+  if (await inspect() === "qso-detail") {
+    // QSO details hide #search but keep the same URL. Reopen the main list
+    // once, then observe readiness without ever retrying a submitted search.
+    await chrome.tabs.update(tab.id, { url: LOGBOOK_URL });
+    const deadline = Date.now() + 25000;
+    let ready = false;
+    while (Date.now() < deadline) {
+      const current = await chrome.tabs.get(tab.id);
+      if (current.url && new URL(current.url).origin !== "https://logbook.qrz.com") {
+        throw new Error("Sign in to QRZ in the opened tab, open your Logbook, then select Search My Logbook again.");
+      }
+      try { ready = await inspect() === "search"; }
+      catch (error) {
+        if (!/frame|document|navigation|context.*destroy/i.test(error.message)) throw error;
+      }
+      if (ready) break;
+      await sleep(250);
+    }
+    if (!ready) throw new Error("QRZ Logbook's main list did not finish opening. Open List in that tab, then try Search My Logbook again.");
   }
   const results = await chrome.scripting.executeScript({
     target: { tabId: tab.id }, func: searchLogbookPage, args: [callsign]

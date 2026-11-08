@@ -1,4 +1,20 @@
 // Serialized by chrome.scripting: keep all dependencies inside this function.
+// QSO details and the searchable list share the same /logbook address.
+export function inspectLogbookPage() {
+  const visible = element => Boolean(element && element.getClientRects().length
+    && getComputedStyle(element).visibility !== "hidden" && !element.disabled);
+  const input = document.getElementById("search");
+  if (input instanceof HTMLInputElement && input.type !== "hidden"
+      && visible(input) && !input.readOnly) return "search";
+  const detail = [...document.querySelectorAll("#lb_body .panelItem.title")]
+    .some(element => visible(element) && element.textContent.trim() === "QSO Detail");
+  // Only leave a read-only detail view, never an editing form or draft.
+  const editing = [...document.querySelectorAll("#lb_body input, #lb_body textarea, #lb_body select, #lb_body [contenteditable]")]
+    .some(element => visible(element) && !element.matches('input[type=hidden], input[type=button], input[type=submit], input[type=reset]'));
+  return detail && !editing ? "qso-detail" : "unavailable";
+}
+
+// Serialized by chrome.scripting: keep all dependencies inside this function.
 // Clicks execute the page's own event handlers without accessing page globals.
 export async function searchLogbookPage(callsign) {
   const visible = element => Boolean(element && element.getClientRects().length

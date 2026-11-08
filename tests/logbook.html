@@ -1,0 +1,81 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>QRZ Logbook search tests</title>
+<style>body{font:16px/1.5 system-ui;margin:40px;max-width:1000px}iframe{width:100%;height:220px}pre{white-space:pre-wrap}</style>
+<h1>QRZ Logbook search tests</h1>
+<p>Synthetic Logbook views only. Find clicks and form submissions are intercepted; no requests are sent to QRZ.</p>
+<button id="run">Run Logbook tests</button>
+<pre id="results">Ready</pre>
+<iframe id="fixture"></iframe>
+<script type="module">
+import {inspectLogbookPage, searchLogbookPage} from '../logbook.js';
+const frame = document.querySelector('#fixture'), output = document.querySelector('#results');
+const list = '<div id="lb_body"><div class="input-group"><input id="search" type="text"><button id="findBtn" type="button">Find</button></div></div>';
+const detail = '<input id="search" type="hidden"><div id="lb_body"><div class="panelItem title">QSO Detail</div><button type="button">Edit</button><table><tr><td>Station</td><td>JE4YMO</td></tr></table></div>';
+const run = (func, ...args) => frame.contentWindow.Function(`return (${func.toString()})`)()(...args);
+async function load(html) {
+  const ready = new Promise(resolve => frame.onload = resolve);
+  frame.srcdoc = html; await ready;
+  const doc = frame.contentDocument;
+  doc.addEventListener('submit', event => event.preventDefault(), true);
+  return doc;
+}
+document.querySelector('#run').onclick = async event => {
+  event.currentTarget.disabled = true;
+  output.textContent = ''; let passed = 0, total = 0;
+  const check = (name, condition) => {
+    total++; passed += Boolean(condition);
+    output.textContent += `${condition ? 'PASS' : 'FAIL'} ${name}\n`;
+  };
+  try {
+    for (const [name, html, expected] of [
+      ['live QSO detail with hidden search is recognized', detail, 'qso-detail'],
+      ['normal list has a searchable field', list, 'search'],
+      ['hidden search alone does not authorize reopening', '<input id="search" type="hidden">', 'unavailable'],
+      ['disabled field is unavailable', list.replace('type="text"', 'type="text" disabled'), 'unavailable'],
+      ['read-only field is unavailable', list.replace('type="text"', 'type="text" readonly'), 'unavailable'],
+      ['hidden QSO title does not authorize reopening', detail.replace('class="panelItem title"', 'class="panelItem title" style="display:none"'), 'unavailable'],
+      ['another view title does not authorize reopening', detail.replace('QSO Detail', 'QSO Edit'), 'unavailable'],
+      ['body text outside the scoped title is insufficient', '<p>QSO Detail</p><div id="lb_body"><p>QSO Detail</p></div>', 'unavailable'],
+      ['an editing field protects the QSO view', detail.replace('</table>', '</table><input name="call" value="JE4YMO">'), 'unavailable'],
+      ['a comment draft protects the QSO view', detail.replace('</table>', '</table><textarea name="comment">Keep this draft</textarea>'), 'unavailable']
+    ]) {
+      await load(html);
+      check(name, run(inspectLogbookPage) === expected);
+    }
+
+    let doc = await load(list), clicks = 0, inputs = 0, changes = 0;
+    doc.querySelector('#findBtn').addEventListener('click', event => { event.preventDefault(); clicks++; });
+    doc.querySelector('#search').addEventListener('input', () => inputs++);
+    doc.querySelector('#search').addEventListener('change', () => changes++);
+    let result = await run(searchLogbookPage, 'EA8/KF6UFO');
+    check('production search enters the requested callsign and clicks Find once',
+      result.ok && result.method === 'button' && doc.querySelector('#search').value === 'EA8/KF6UFO' && clicks === 1);
+    check('production search notifies field listeners once', inputs === 1 && changes === 1);
+
+    doc = await load('<div id="lb_body"></div>'); clicks = 0;
+    const delayed = run(searchLogbookPage, 'TF1FT');
+    setTimeout(() => {
+      doc.body.innerHTML = list;
+      doc.querySelector('#findBtn').addEventListener('click', event => { event.preventDefault(); clicks++; });
+    }, 30);
+    result = await delayed;
+    check('delayed main-list field receives one search after readiness',
+      result.ok && doc.querySelector('#search').value === 'TF1FT' && clicks === 1 && run(inspectLogbookPage) === 'search');
+
+    doc = await load('<div id="lb_body"><input id="search" type="text"></div>');
+    let enters = 0;
+    doc.querySelector('#search').addEventListener('keydown', event => {
+      if (event.key === 'Enter' && event.keyCode === 13) { enters++; event.preventDefault(); }
+    });
+    result = await run(searchLogbookPage, 'JE4YMO');
+    check('native Enter fallback dispatches only once',
+      result.ok && result.method === 'enter' && enters === 1 && doc.querySelector('#search').value === 'JE4YMO');
+  } catch (error) {
+    check('fixture runner completed', false);
+    output.textContent += `${error.message}\n`;
+  }
+  output.textContent += `${passed}/${total} passed`;
+  document.querySelector('#run').disabled = false;
+};
+</script>

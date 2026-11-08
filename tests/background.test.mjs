@@ -14,13 +14,14 @@ async function settle() { for (let i = 0; i < 8; i++) await tick(); }
 async function setup({
   statuses = ['unsigned', 'submitted', 'already-signed'],
   sourceOverrides = {}, sourceMissing = false, createError = null, updateError = null,
-  createdOverrides = {}, feedbackError = false, reloadError = null, hook = null, getHook = null, bioStatus = 'bio'
+  createdOverrides = {}, feedbackError = false, reloadError = null, hook = null, getHook = null, bioStatus = 'bio',
+  logbookStates = ['search'], logbookResult = { ok: true }, logbookOverrides = {}
 } = {}) {
   const actions = [], menus = [];
   let installed, clicked, nextId = 10;
   const sourceTab = { ...SOURCE, active: true, status: 'complete', url: 'https://forums.qrz.com/index.php?account/alerts', ...sourceOverrides };
   const elsewhere = { id: 42, windowId: 9, incognito: false, active: false, status: 'complete', url: 'https://www.qrz.com/db/KE9ZZ' };
-  const logbook = { id: 50, windowId: 9, incognito: false, active: false, status: 'complete', url: 'https://logbook.qrz.com/logbook' };
+  const logbook = { id: 50, windowId: 9, incognito: false, active: false, status: 'complete', url: 'https://logbook.qrz.com/logbook', ...logbookOverrides };
   const tabs = new Map([[elsewhere.id, elsewhere], [logbook.id, logbook]]);
   if (!sourceMissing) tabs.set(SOURCE.id, sourceTab);
   globalThis.chrome = {
@@ -71,10 +72,19 @@ async function setup({
       update: async (...args) => { actions.push(['window', ...args]); }
     },
     scripting: {
-      executeScript: async ({ target, func, args, injectImmediately }) => {
+      executeScript: async ({ target, func, args = [], injectImmediately }) => {
         actions.push([func.name, ...args, { targetTabId: target.tabId, injectImmediately }]);
         if (hook) await hook({ target, func, args, tabs, actions });
         if (func.name === 'showWebLogFeedback' && feedbackError) throw new Error('Page cannot receive feedback');
+        if (func.name === 'inspectLogbookPage') {
+          const state = logbookStates.shift() ?? 'search';
+          if (state instanceof Error) throw state;
+          return [{ result: state }];
+        }
+        if (func.name === 'searchLogbookPage') {
+          if (logbookResult instanceof Error) throw logbookResult;
+          return [{ result: logbookResult }];
+        }
         if (func.name === 'webLogPage') {
           const status = args[1] === 'bio' ? bioStatus : statuses.shift() ?? 'ambiguous';
           if (status instanceof Error) throw status;
@@ -84,7 +94,7 @@ async function setup({
       }
     }
   };
-  const stubs = 'function webLogPage(){} function showWebLogFeedback(){} function searchLogbookPage(){}';
+  const stubs = 'function webLogPage(){} function showWebLogFeedback(){} function searchLogbookPage(){} function inspectLogbookPage(){}';
   const script = stubs + callsign.replace('export function', 'function')
     + source.replace(/^import .*;\n/gm, '')
       .replace(/const sleep = .*;/, 'const sleep = async () => {};')
@@ -618,4 +628,99 @@ test('existing logbook search still reuses its logbook tab and invokes page sear
   assert.equal(of(s, 'create').length, 0);
   assert.ok(of(s, 'searchLogbookPage').some(action => action[1] === 'EA4IJS' && action.at(-1).targetTabId === 50));
   assert.equal(of(s, 'window').length, 1);
+  assert.equal(of(s, 'update').filter(action => action[2].url).length, 0, 'a searchable list is not reopened');
+  assert.equal(of(s, 'inspectLogbookPage').length, 1);
+});
+
+for (const url of ['https://logbook.qrz.com/logbook', 'https://logbook.qrz.com/logbook?op=show&logid=123']) {
+  test(`QSO detail returns to the main list in the same tab before searching: ${url}`, async () => {
+    const s = await setup({ logbookOverrides: { url },
+      logbookStates: ['qso-detail', 'qso-detail', 'unavailable', 'search'] });
+    await s.module.searchLogbook('EA8/KF6UFO', SOURCE);
+    assert.equal(of(s, 'create').length, 0);
+    assert.deepEqual(of(s, 'update').filter(action => action[2].url), [
+      ['update', 50, { url: 'https://logbook.qrz.com/logbook' }]
+    ]);
+    assert.equal(of(s, 'inspectLogbookPage').length, 4, 'old QSO DOM and delayed list are observed without another reset');
+    assert.deepEqual(of(s, 'searchLogbookPage').map(action => action.slice(1)), [
+      ['EA8/KF6UFO', { targetTabId: 50, injectImmediately: undefined }]
+    ]);
+    assert.ok(s.actions.indexOf(of(s, 'inspectLogbookPage').at(-1)) < s.actions.indexOf(of(s, 'searchLogbookPage')[0]));
+    assert.equal(s.tabs.get(50).status, 'complete', 'readiness must not rely on seeing a Chrome loading transition');
+    assert.equal(of(s, 'webLogPage').length, 0);
+  });
+}
+
+test('QSO recovery tolerates a replaced document during read-only readiness checks', async () => {
+  const s = await setup({ logbookStates: ['qso-detail', new Error('Frame with ID 0 was removed.'), 'search'] });
+  await s.module.searchLogbook('EA4IJS', SOURCE);
+  assert.equal(of(s, 'inspectLogbookPage').length, 3);
+  assert.equal(of(s, 'update').filter(action => action[2].url).length, 1);
+  assert.equal(of(s, 'searchLogbookPage').length, 1);
+});
+
+test('QSO recovery stops after one reset if the main list never becomes ready', async () => {
+  const s = await setup({ logbookStates: Array(100).fill('qso-detail') });
+  await assert.rejects(s.module.searchLogbook('EA4IJS', SOURCE), /main list did not finish opening/);
+  assert.equal(of(s, 'update').filter(action => action[2].url).length, 1);
+  assert.equal(of(s, 'searchLogbookPage').length, 0);
+  assert.ok(of(s, 'inspectLogbookPage').length > 1 && of(s, 'inspectLogbookPage').length < 100);
+  assert.ok(s.tabs.has(50), 'the reused tab stays open');
+});
+
+for (const logbookStates of [[new Error('Permission denied')], ['qso-detail', new Error('Permission denied')]]) {
+  test(`inspection permission failure stops without retry at stage ${logbookStates.length}`, async () => {
+    const s = await setup({ logbookStates: [...logbookStates] });
+    await assert.rejects(s.module.searchLogbook('EA4IJS', SOURCE), /Permission denied/);
+    assert.equal(of(s, 'inspectLogbookPage').length, logbookStates.length);
+    assert.equal(of(s, 'update').filter(action => action[2].url).length, logbookStates.length - 1);
+    assert.equal(of(s, 'searchLogbookPage').length, 0);
+  });
+}
+
+test('QSO recovery stops on a sign-in redirect without injecting into the new host', async () => {
+  let inspections = 0;
+  const s = await setup({ logbookStates: ['qso-detail', 'unavailable'], hook: ({ func, tabs }) => {
+    if (func.name === 'inspectLogbookPage' && ++inspections === 2) {
+      tabs.set(50, { ...tabs.get(50), url: 'https://www.qrz.com/login' });
+    }
+  } });
+  await assert.rejects(s.module.searchLogbook('EA4IJS', SOURCE), /Sign in to QRZ/);
+  assert.equal(of(s, 'inspectLogbookPage').length, 2);
+  assert.equal(of(s, 'searchLogbookPage').length, 0);
+});
+
+test('unrecognized pages and editing views do not trigger a Logbook reset', async () => {
+  const s = await setup({ logbookStates: ['unavailable'],
+    logbookResult: { ok: false, message: 'Search field is unavailable' } });
+  await assert.rejects(s.module.searchLogbook('EA4IJS', SOURCE), /Search field is unavailable/);
+  assert.equal(of(s, 'update').filter(action => action[2].url).length, 0);
+  assert.equal(of(s, 'searchLogbookPage').length, 1);
+});
+
+for (const logbookResult of [{ ok: false, message: 'Find control was not recognized' }, new Error('Frame removed after search')]) {
+  test(`a failed search after QSO recovery is never repeated: ${logbookResult.message}`, async () => {
+    const s = await setup({ logbookStates: ['qso-detail', 'search'], logbookResult });
+    await assert.rejects(s.module.searchLogbook('EA4IJS', SOURCE), /Find control|Frame removed/);
+    assert.equal(of(s, 'update').filter(action => action[2].url).length, 1);
+    assert.equal(of(s, 'searchLogbookPage').length, 1);
+  });
+}
+
+test('Logbook requests stay serialized while the first request recovers a QSO view', async () => {
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  let held = false;
+  const s = await setup({ logbookStates: ['qso-detail', 'search', 'search'], hook: async ({ func }) => {
+    if (func.name === 'inspectLogbookPage' && !held) { held = true; await gate; }
+  } });
+  s.clicked({ menuItemId: 'qrzLogbook', selectionText: 'EA4IJS' }, SOURCE);
+  s.clicked({ menuItemId: 'qrzLogbook', selectionText: 'W1AW' }, SOURCE);
+  await settle();
+  assert.equal(of(s, 'query').length, 1, 'the second request waits until recovery and the first search finish');
+  assert.equal(of(s, 'searchLogbookPage').length, 0);
+  release(); await settle();
+  assert.deepEqual(of(s, 'searchLogbookPage').map(action => action[1]), ['EA4IJS', 'W1AW']);
+  assert.equal(of(s, 'update').filter(action => action[2].url).length, 1);
+  assert.equal(of(s, 'create').length, 0);
 });

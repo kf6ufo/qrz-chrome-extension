@@ -1,6 +1,8 @@
-# Verification — QRZ Callsign Extension 2.2.11
+# Verification — QRZ Callsign Extension 2.2.12
 
-Updated November 8, 2026. The verification set contains **155 local checks**. All **77 background checks** passed for 2.2.11; the unchanged browser fixtures retain their prior passing results below.
+Updated November 8, 2026. The verification set contains **180 local checks**. All **88 background checks** and **14 Logbook browser checks** passed for 2.2.12; the unchanged Web Log and notification fixtures retain their prior passing results below.
+
+Version 2.2.12 fixes **Search My Logbook** when an existing tab is showing QSO details at the same `/logbook` URL. It detects QRZ's visible, scoped QSO Detail title and hidden search field, reopens the main Logbook in the same tab once, and polls for the visible search field before submitting the requested search once. Read-only readiness checks can recover from transient document navigation errors, while permission failures and sign-in redirects stop. Unknown views and editing forms do not trigger a reset. No permissions were added.
 
 Version 2.2.11 fixes **Look Up Their Callsign** and **Search My Logbook** for the linked callsigns observed on QRZ QSO details and PSKReporter. QRZ's HTTP station URLs are parsed and converted into canonical HTTPS destinations. PSKReporter's two map callsign link formats are parsed as literal text, without executing their JavaScript. A recognized station link takes precedence over selected text; otherwise, one valid selected callsign can be used on other links. Web Log signing retains its existing link validation and never falls back to a leftover selection on an unrecognized link. No permissions were added.
 
@@ -12,7 +14,8 @@ Version 2.2.8 introduced the shared callsign marker inside QRZ's native station 
 
 | Check | Result | Latest execution |
 | --- | --- | --- |
-| Background orchestration and menu tests | 77/77 | Rerun for 2.2.11 |
+| Background orchestration and menu tests | 88/88 | Rerun for 2.2.12 |
+| Logbook search browser fixtures in Chrome | 14/14 | Run for 2.2.12 |
 | Web Log browser fixtures in Chrome | 65/65 | Prior passing run for 2.2.9; signing behavior unchanged |
 | Notification callsign browser fixtures in Chrome | 13/13 | Prior passing run; notification code unchanged |
 
@@ -32,6 +35,10 @@ The background suite simulates Chrome APIs and checks:
 - Valid selection fallback on unrecognized links, rejection of invalid selections, and recognized-link precedence over stale selection.
 - PSKReporter source/frame validation and rejection of appended JavaScript, extra arguments, expressions, mismatched quotes, and unrelated functions. QRZ lookalike hosts, credentials, nonstandard ports, malformed encoding, queries, and fragments remain rejected without a valid selection.
 - All newly supported read-only link formats remain unable to trigger signing using stale selected text.
+- QSO recovery in the existing Logbook tab with and without query parameters, readiness while the old document still reports complete, delayed search fields, transient frame errors, bounded timeouts, permission errors, and sign-in redirects.
+- Search submission occurs once after recovery, errors do not repeat searches, and queued Logbook requests remain ordered during recovery. A normal list or unrecognized view is not reset.
+
+The Logbook browser fixtures execute the production inspector and search function against synthetic HTML. They reproduce the inspected QSO Detail title and hidden `#search`, verify visible/disabled/read-only fields and draft preservation, and check callsign entry, field events, one intercepted Find click, delayed field readiness, and the Enter fallback. These fixtures make no QRZ requests.
 
 The Web Log browser fixtures execute the production page function against synthetic HTML. All submissions are intercepted. They cover all five observed station heading styles; unsigned, already-signed, and no-Web states; identity and destination checks; drafts; unexpected or hidden controls; conflicting signature information; duplicate protection; delayed content; unfinished HTML parsing; and Biography selection. Regressions include FK8HA's no-Web/Biography flow, KC5UZI's already-signed Web state, and single intercepted submissions for both additional styles. Wrong callsigns, mixed duplicate headings, and callsigns found only in body or biography content must stop submission.
 
@@ -40,6 +47,8 @@ Delayed-widget fixtures start with parsed native markup before roles and ARIA st
 The notification fixtures cover QRZ’s line-break formatting, multiple and portable callsigns, pagination, unchanged View links and account callsigns, unrelated pages, and idempotent linking.
 
 ## Live validation and limits
+
+For 2.2.12, inspection of the user's open Logbook tab confirmed the same `/logbook` address, a visible `#lb_body .panelItem.title` containing `QSO Detail`, and a hidden `#search` input. QRZ's List control returned to the searchable list. A fresh canonical `https://logbook.qrz.com/logbook` navigation also opened that list with a visible search field and the same selected Logbook. No QSO was edited or submitted. The 14 new browser checks passed in Chrome; the installed extension still needs reloading for a complete live menu retry.
 
 On November 8, read-only inspection of the user's open pages confirmed that QRZ QSO details linked JE4YMO with `http://www.qrz.com/db/JE4YMO`, while PSKReporter's map linked KF6UFO and TF1FT with `javascript:showAndSetCallsign('KF6UFO')` and `javascript:showAndSetRxCallsign('TF1FT')`. The new regressions use these exact formats. Chrome's [context-menu API](https://developer.chrome.com/docs/extensions/reference/api/contextMenus#type-OnClickData) supplies a link URL and any selected text, rather than the link's displayed callsign. The previous resolver rejected both formats and ignored selected text whenever a link URL was present.
 
@@ -67,4 +76,4 @@ No real signature was submitted by the agent. The user initiated the live signat
 node --test tests/background.test.mjs
 ```
 
-Serve the repository locally, then open `tests/weblog.html` and `tests/notifications.html` in Chrome and use their test buttons. These browser fixtures do not contact QRZ or submit real signatures.
+Serve the repository locally, then open `tests/logbook.html`, `tests/weblog.html`, and `tests/notifications.html` in Chrome and use their test buttons. These browser fixtures do not contact QRZ or submit real signatures.
