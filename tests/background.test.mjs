@@ -771,3 +771,56 @@ test('Logbook requests stay serialized while the first request recovers a QSO vi
   assert.equal(of(s, 'update').filter(action => action[2].url).length, 1);
   assert.equal(of(s, 'create').length, 0);
 });
+
+
+test('PU2UTY redirected to PY2UTY with no Web Log reports the resolved station and opens Biography', async () => {
+  const s = await setup({
+    createdOverrides: { url: 'https://www.qrz.com/db/PY2UTY' },
+    statuses: ['no-web-tab']
+  });
+  const result = await s.module.signWebLog('PU2UTY', SOURCE);
+  assert.equal(result.status, 'redirect-no-web-tab');
+  assert.match(result.message, /redirected PU2UTY to PY2UTY.*doesn't publish a Web Log/);
+  assert.match(result.message, /Nothing was submitted/);
+  assert.deepEqual(runs(s, 'prepare').map(action => action[1]), ['PY2UTY']);
+  assert.deepEqual(runs(s, 'bio').map(action => action[1]), ['PY2UTY']);
+  assert.equal(runs(s, 'sign').length, 0);
+  assert.equal(of(s, 'create').length, 1);
+  assert.equal(of(s, 'create')[0][1].url, 'https://www.qrz.com/db/PU2UTY');
+  assert.equal(of(s, 'update').length, 1);
+  assert.equal(s.tabs.get(SOURCE.id).active, true);
+});
+
+for (const destinationState of ['unsigned', 'already-signed', 'ambiguous']) {
+  test(`redirected callsign with ${destinationState} Web state is never signed automatically`, async () => {
+    const s = await setup({
+      createdOverrides: { url: 'https://www.qrz.com/db/PY2UTY' },
+      statuses: [destinationState]
+    });
+    const result = await s.module.signWebLog('PU2UTY', SOURCE);
+    assert.equal(result.status, 'redirected');
+    assert.match(result.message, /redirected PU2UTY to PY2UTY/);
+    assert.match(result.message, /No signature was submitted|Nothing was submitted/);
+    assert.deepEqual(runs(s, 'prepare').map(action => action[1]), ['PY2UTY']);
+    assert.equal(runs(s, 'sign').length, 0);
+    assert.equal(runs(s, 'bio').length, 0);
+    assert.equal(of(s, 'update').length, 1);
+  });
+}
+
+test('unrecognized redirect is uncertain, not falsely called a login failure', async () => {
+  const s = await setup({ createdOverrides: { url: 'https://www.qrz.com/unexpected' } });
+  const result = await s.module.signWebLog('PU2UTY', SOURCE);
+  assert.equal(result.status, 'ambiguous');
+  assert.match(result.message, /unexpected destination/);
+  assert.equal(runs(s, 'sign').length, 0);
+  assert.equal(runs(s, 'prepare').length, 0);
+});
+
+test('explicit QRZ login redirect still reports login required', async () => {
+  const s = await setup({ createdOverrides: { url: 'https://www.qrz.com/login' } });
+  const result = await s.module.signWebLog('PU2UTY', SOURCE);
+  assert.equal(result.status, 'login-required');
+  assert.equal(runs(s, 'sign').length, 0);
+  assert.equal(runs(s, 'prepare').length, 0);
+});
