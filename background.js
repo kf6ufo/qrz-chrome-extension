@@ -117,10 +117,10 @@ export async function signWebLog(callsign, sourceTab) {
     "settings-error": "Your saved Web Log comment could not be read or is invalid. Open the extension's Options and save a comment of up to 171 characters, or leave it empty. Then try again. Nothing was submitted."
   };
   let comment = "";
-  const run = async (mode, account = null) => {
+  const run = async (mode, account = null, targetCallsign = callsign) => {
     await ownedTab();
     const output = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: webLogPage,
-      args: [callsign, mode, account, comment], injectImmediately: true });
+      args: [targetCallsign, mode, account, comment], injectImmediately: true });
     return output[0]?.result || { status: "ambiguous" };
   };
   const prepareStation = async () => {
@@ -128,15 +128,29 @@ export async function signWebLog(callsign, sourceTab) {
     let navigationRetries = 0;
     while (Date.now() < deadline) {
       const current = await ownedTab();
+      let targetCallsign = callsign;
       if (!matches(current.url)) {
-        if (matches(current.pendingUrl) || !current.url || current.url === "about:blank") {
+        if (matches(current.pendingUrl) || !current.url || current.url === "about:blank"
+            || (current.pendingUrl && current.pendingUrl !== current.url)) {
           await sleep(250);
           continue;
         }
-        return { status: "login-required" };
+        // QRZ can resolve an old callsign to a different, current station.
+        // Inspect that station read-only, but never sign a redirected callsign.
+        const destination = stationLinkCallsign(current.url, false);
+        if (!destination || destination === callsign) {
+          let login = false;
+          try {
+            const url = new URL(current.url);
+            login = url.origin === "https://www.qrz.com" && /^\/login(?:\/|$)/i.test(url.pathname);
+          } catch { /* An unknown URL is not proof of a login failure. */ }
+          return login ? { status: "login-required" }
+            : { status: "ambiguous", reason: "station-redirect" };
+        }
+        targetCallsign = destination;
       }
       let state;
-      try { state = await run("prepare"); }
+      try { state = await run("prepare", null, targetCallsign); }
       catch (error) {
         // Preparation can open Web but never submits. Recover once from a
         // replaced frame; never retry sign or retry a returned validation failure.
@@ -147,7 +161,13 @@ export async function signWebLog(callsign, sourceTab) {
         }
         throw error;
       }
-      if (state.status !== "loading") return state;
+      if (state.status !== "loading") {
+        if (targetCallsign === callsign) return state;
+        return {
+          status: state.status === "no-web-tab" ? "redirect-no-web-tab" : "redirected",
+          account: state.account, redirectedTo: targetCallsign, reason: state.status
+        };
+      }
       await sleep(250);
     }
     return { status: "ambiguous", reason: "page-loading" };
@@ -177,15 +197,23 @@ export async function signWebLog(callsign, sourceTab) {
     "form-hidden": "The signature controls were not visible.",
     "duplicate": "This page already had a signature attempt in progress.",
     "page-unavailable": "The page changed or became unavailable during the check.",
-    "page-loading": "QRZ's station page is still loading. The tab has been left open."
+    "page-loading": "QRZ's station page is still loading. The tab has been left open.",
+    "station-redirect": "QRZ opened an unexpected destination instead of the selected station."
   };
-  const finish = async (status, account = null, reason = null) => {
+  const finish = async (status, account = null, reason = null, redirectedTo = null) => {
     await ownedTab();
     let message = messages[status] || messages.ambiguous;
+    if (status === "redirect-no-web-tab") {
+      message = `QRZ redirected ${callsign} to ${redirectedTo}. ${redirectedTo} doesn't publish a Web Log. Showing the biography. Nothing was submitted.`;
+    } else if (status === "redirected") {
+      message = ["unsigned", "already-signed"].includes(reason)
+        ? `QRZ redirected ${callsign} to ${redirectedTo}, which has a Web Log. No signature was submitted because the callsign changed. Review the destination manually.`
+        : `QRZ redirected ${callsign} to ${redirectedTo}. Its Web Log could not be verified. Nothing was submitted.`;
+    }
     if (status === "ambiguous" && reasons[reason]) message += " " + reasons[reason];
-    if (status === "success" || status === "no-web-tab") {
+    if (status === "success" || status === "no-web-tab" || status === "redirect-no-web-tab") {
       try {
-        const state = await run("bio", account);
+        const state = await run("bio", account, redirectedTo || callsign);
         if (state.status !== "bio") message += " Select Biography to view the bio.";
       } catch { message += " Select Biography to view the bio."; }
     }
@@ -213,7 +241,7 @@ export async function signWebLog(callsign, sourceTab) {
     // QRZ's own parsed content is the readiness signal. Slow ads can leave
     // Chrome's tab status loading after the Web Log is already usable.
     let state = await prepareStation();
-    if (state.status !== "unsigned") return await finish(state.status, state.account, state.reason);
+    if (state.status !== "unsigned") return await finish(state.status, state.account, state.reason, state.redirectedTo);
     const account = state.account;
     // This work tab was just opened from QRZ. The old reused-tab flow refreshed
     // here, but same-URL reloads can interrupt the next check before Chrome
