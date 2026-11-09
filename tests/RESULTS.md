@@ -1,10 +1,12 @@
-# Verification — QRZ Callsign Extension 2.2.14
+# Verification — QRZ Callsign Extension 2.2.15
 
-Version 2.2.14 adds read-only inspection of QRZ callsign redirects, motivated by PU2UTY resolving to PY2UTY. If the destination has no Web Log, the extension reports the redirect and opens Biography. If a different callsign has a Web Log or verification fails, it never submits a signature. Only explicit QRZ login redirects are labeled login-required; unknown destinations are ambiguous. Six new background regression cases were added but have not yet been executed in this environment. **The passing totals below are from 2.2.13, not a claimed 2.2.14 test run.**
+Updated November 9, 2026. Version 2.2.15 preserves literal slashes in QRZ station URLs for lookups, Web Log work tabs, and notification links. Read-only inspection confirmed that `https://www.qrz.com/db/K6VHF%2FHR9` returns QRZ's generic Page Not Found page, which lacks the account menu and caused the misleading account-identification error. The literal-slash URL `https://www.qrz.com/db/K6VHF/HR9` opens the correct station with the signed-in account menu, a unique `csignz hamcall` heading, and no Web tab or panel. Account and station validation remain unchanged.
 
-## Previous verification (2.2.13)
+All **220 checks executed for 2.2.15 passed**: **105 background**, **14 settings**, **87 Web Log browser**, and **14 notification browser** checks. The verification set contains **244 local checks** including the unchanged Settings and Logbook browser fixtures, whose 24 earlier passing checks were not rerun. Incoming encoded-slash links remain accepted, but generated destinations retain literal slashes. Regressions cover selected text and both incoming link formats for K6VHF/HR9, its no-Web/Biography outcome, portable notification destinations, and exact suffix validation before an intercepted local signature.
 
-Updated November 8, 2026. The verification set contains **229 local checks**. All **95 background checks**, **14 settings checks**, **83 Web Log browser checks**, and **10 Settings browser checks** passed for 2.2.13 (**202 current checks**). The unchanged Logbook and notification browser fixtures retain their prior passing results below.
+Version 2.2.14 adds read-only inspection of QRZ callsign redirects, motivated by PU2UTY resolving to PY2UTY. If the destination has no Web Log, the extension reports the redirect and opens Biography. If a different callsign has a Web Log or verification fails, it never submits a signature. Only explicit QRZ login redirects are labeled login-required; unknown destinations are ambiguous. All six redirect regression cases passed in the 2.2.15 background run.
+
+## Earlier changes
 
 Version 2.2.13 adds an Options page for an optional, reusable Web Log comment. The **171-character** limit matches the user's complete West Virginia example, excluding its outer quotation marks. The Colorado example is a placeholder; existing users continue signing with an empty comment until they explicitly save a setting. The page provides a live count, Save, and Clear followed by Save, and reports load/save errors. Comments remain local to the Chrome profile using `chrome.storage.local`; the manifest adds only the `storage` permission and the options page, without expanding site access. See Chrome's [storage API](https://developer.chrome.com/docs/extensions/reference/api/storage) and [Options page documentation](https://developer.chrome.com/docs/extensions/develop/ui/options-page).
 
@@ -22,12 +24,12 @@ Version 2.2.8 introduced the shared callsign marker inside QRZ's native station 
 
 | Check | Result | Latest execution |
 | --- | --- | --- |
-| Background orchestration and menu tests | 95/95 | Rerun for 2.2.13 |
-| Settings validation and UI controller tests | 14/14 | Run for 2.2.13 |
-| Web Log browser fixtures in Chrome | 83/83 | Rerun for 2.2.13 |
-| Settings browser fixtures in Chrome | 10/10 | Run for 2.2.13 |
+| Background orchestration and menu tests | 105/105 | Rerun for 2.2.15 |
+| Settings validation and UI controller tests | 14/14 | Rerun for 2.2.15 |
+| Web Log browser fixtures in Chrome | 87/87 | Rerun for 2.2.15 |
+| Settings browser fixtures in Chrome | 10/10 | Prior passing run for 2.2.13; Settings UI unchanged |
 | Logbook search browser fixtures in Chrome | 14/14 | Prior passing run for 2.2.12; Logbook code unchanged |
-| Notification callsign browser fixtures in Chrome | 13/13 | Prior passing run; notification code unchanged |
+| Notification callsign browser fixtures in Chrome | 14/14 | Rerun for 2.2.15 |
 
 ## Local coverage
 
@@ -62,6 +64,8 @@ Delayed-widget fixtures start with parsed native markup before roles and ARIA st
 The notification fixtures cover QRZ’s line-break formatting, multiple and portable callsigns, pagination, unchanged View links and account callsigns, unrelated pages, and idempotent linking.
 
 ## Live validation and limits
+
+For 2.2.15, the failing encoded-slash URL and the correct literal-slash station URL were inspected in the user's signed-in Chrome profile. K6VHF/HR9 currently publishes no Web Log, so the expected result is an explanatory no-Web message with Biography selected. Local Web Log and notification browser fixtures passed in Chrome; all synthetic form submissions were intercepted. No live signature was submitted by the agent. The user reloaded the updated extension, retried K6VHF/HR9, and confirmed that it worked perfectly.
 
 For 2.2.13, the production Options page was previewed in Chrome using simulated local storage, and all 83 Web Log plus 10 Settings browser checks passed. A screenshot records the new page with the sample greeting and live counter. No real extension setting was changed and no live Web Log signature was submitted. The installed extension must be updated/reloaded before opening its Options page and trying a configured signature.
 

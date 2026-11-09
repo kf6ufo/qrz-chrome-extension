@@ -5,7 +5,7 @@
 import {webLogPage} from '../weblog.js';
 const frame = document.querySelector('iframe'), output = document.querySelector('pre');
 // Substitute only location in this test copy: production retains its HTTPS guard.
-const build = (win, station='KE9ZZ') => win.Function('fixtureLocation', `return (${webLogPage.toString().replace(/\blocation\b/g, 'fixtureLocation')})`)({origin:'https://www.qrz.com',href:'https://www.qrz.com/db/'+encodeURIComponent(station),pathname:'/db/'+encodeURIComponent(station)});
+const build = (win, station='KE9ZZ') => win.Function('fixtureLocation', `return (${webLogPage.toString().replace(/\blocation\b/g, 'fixtureLocation')})`)({origin:'https://www.qrz.com',href:'https://www.qrz.com/db/'+station,pathname:'/db/'+station});
 const base = (content, web=true, station='KE9ZZ') => `<div id="qrztop"><ul><li><a href="https://www.qrz.com/db/KF6UFO">KF6UFO page...</a></li><li><a href="https://www.qrz.com/logout/test">Logout</a></li></ul></div><div id="csdata"><span class="csigns hamcall">${station}</span></div><div id="tabs"><ul role="tablist"><li role="tab" aria-selected="${!web}"><a href="#t_bio">Biography</a></li>${web ? '<li role="tab" aria-selected="true"><a href="#t_webcon">Web <span>241</span></a></li>' : ''}</ul><div id="t_bio" aria-hidden="${web}"${web ? ' style="display:none"' : ''}><p>Station biography</p></div>${web ? `<div id="t_webcon" aria-hidden="false">${content}</div>` : ''}</div>`;
 // QRZ uses csignmg instead of csigns for managed station headings such as JD1BQP.
 const managedBase = (content, web=true, station='JD1BQP') => base(content,web,station).replace('class="csigns hamcall"','class="csignmg hamcall"');
@@ -107,6 +107,24 @@ document.querySelector('button').onclick = async () => {
    const got=await build(frame.contentWindow)('KE9ZZ',mode,account);
    const reasonOK=expected!=='ambiguous'||(typeof got.reason==='string'&&got.reason===reasons[name]);
    check(name,got.status===expected && clicks===0 && reasonOK,`${got.status}${got.reason?' ('+got.reason+')':''}; submissions ${clicks}`);
+ }
+ // K6VHF/HR9's live station uses csignz and publishes no Web tab. Its URL
+ // must retain the slash; QRZ's %2F destination is a generic 404 page.
+ const portable='K6VHF/HR9';
+ const portableDoc=await load(styledBase('csignz',portable,'',false));let portableClicks=0;
+ portableDoc.addEventListener('click',()=>portableClicks++);
+ const portableRun=build(frame.contentWindow,portable);
+ const portableState=await portableRun(portable,'prepare');
+ check('K6VHF/HR9 is recognized as a signed-in station without a Web Log',portableState.status==='no-web-tab'&&portableState.account==='KF6UFO'&&portableClicks===0);
+ const portableBio=await portableRun(portable,'bio','KF6UFO');
+ check('K6VHF/HR9 retains Biography with no signature attempt',portableBio.status==='bio'&&portableClicks===0&&portableDoc.querySelector('#t_bio').getAttribute('aria-hidden')==='false'&&!portableDoc.querySelector('form'));
+ // Other slashed stations can publish Web Logs. Recheck the complete target
+ // including its suffix before allowing one intercepted local submission.
+ for(const [requested,expected] of [[portable,'submitted'],['K6VHF/HR8','ambiguous']]) {
+   const doc=await load(base(form.replace('/db/KE9ZZ','/db/'+portable),true,portable));let submits=0;
+   doc.addEventListener('submit',e=>{e.preventDefault();submits++;});
+   const state=await build(frame.contentWindow,portable)(requested,'sign','KF6UFO');
+   check(`slashed Web Log checks the complete station: ${requested}`,state.status===expected&&submits===(expected==='submitted'?1:0)&&(expected!=='ambiguous'||state.reason==='station'));
  }
  // An early injection must not inspect or submit even complete-looking markup
  // while the browser is still parsing the document.

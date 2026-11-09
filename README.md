@@ -42,6 +42,8 @@ On other pages or links, highlight one complete callsign, right-click, and choos
 
 For **Sign Their Web Log**, right-click a callsign in QRZ Notifications or a biography link beginning with `https://www.qrz.com/db/`. You can also highlight a callsign in plain text and right-click it.
 
+Slashed callsigns such as `K6VHF/HR9` keep their slashes in QRZ station addresses. If the station has no Web Log, the extension explains this and shows Biography.
+
 **Search My Logbook** brings an existing QRZ Logbook tab forward, including one in another Chrome window. If that tab is showing QSO details, it reopens the main Logbook in the same tab before searching. If no Logbook tab is open, it opens one for you.
 
 ## Configuration

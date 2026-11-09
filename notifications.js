@@ -32,7 +32,8 @@
           const offset = match.index + match[0].length - match[1].length;
           fragment.append(document.createTextNode(text.slice(start, offset)));
           const link = document.createElement("a");
-          link.href = "https://www.qrz.com/db/" + encodeURIComponent(match[1].toUpperCase());
+          // QRZ rejects encoded slashes in portable station URLs.
+          link.href = "https://www.qrz.com/db/" + encodeURIComponent(match[1].toUpperCase()).replace(/%2F/g, "/");
           link.textContent = match[1];
           link.dataset.qrzNotificationCallsign = "true";
           fragment.append(link);

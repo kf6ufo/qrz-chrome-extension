@@ -15,7 +15,8 @@ const fixture = `<div id="alert123"><h3><strong>QRZ Logbook Confirmation</strong
 <div id="alert124"><h3>QRZ Logbook Confirmation • QSO #1 W1AW/7 DE KF6UFO • QSO #2 ea8/kf6ufo DE KF6UFO</h3></div>
 <div id="alert125"><h3>Forum reply • QSO #1 W1AW DE KF6UFO</h3></div>
 <div id="other"><h3>QRZ Logbook Confirmation • QSO #1 W1AW DE KF6UFO</h3></div>
-<div id="alert126"><h3>QRZ Logbook Confirmation • QSO #1 123 DE KF6UFO • QSO #2 INVALID DE KF6UFO</h3></div>`;
+<div id="alert126"><h3>QRZ Logbook Confirmation • QSO #1 123 DE KF6UFO • QSO #2 INVALID DE KF6UFO</h3></div>
+<div id="alert127"><h3>QRZ Logbook Confirmation • QSO #1 K6VHF/HR9 DE KF6UFO</h3></div>`;
 document.querySelector('#run').onclick = async () => {
   output.textContent = ''; let passed = 0, total = 0;
   function check(name, condition) { total++; passed += Boolean(condition); output.textContent += `${condition ? 'PASS' : 'FAIL'} ${name}\n`; }
@@ -24,17 +25,18 @@ document.querySelector('#run').onclick = async () => {
   const run = (where = location) => frame.contentWindow.Function('location', source)(where);
   run();
   const links = () => [...d.querySelectorAll('[data-qrz-notification-callsign]')];
-  check('four station links, including slash and lowercase callsigns', JSON.stringify(links().map(a=>a.textContent)) === JSON.stringify(['EI2GN','BW2/JP1RIW','W1AW/7','ea8/kf6ufo']));
-  check('encoded station destination', links()[1]?.getAttribute('href') === 'https://www.qrz.com/db/BW2%2FJP1RIW');
-  check('lowercase destination normalized', links()[3]?.getAttribute('href') === 'https://www.qrz.com/db/EA8%2FKF6UFO');
+  check('five station links, including slash and lowercase callsigns', JSON.stringify(links().map(a=>a.textContent)) === JSON.stringify(['EI2GN','BW2/JP1RIW','W1AW/7','ea8/kf6ufo','K6VHF/HR9']));
+  check('portable station destination preserves slash', links()[1]?.getAttribute('href') === 'https://www.qrz.com/db/BW2/JP1RIW');
+  check('lowercase destination normalized', links()[3]?.getAttribute('href') === 'https://www.qrz.com/db/EA8/KF6UFO');
+  check('K6VHF/HR9 destination preserves QRZ slash routing', links()[4]?.getAttribute('href') === 'https://www.qrz.com/db/K6VHF/HR9');
   check('visible text preserved exactly', d.body.textContent === originalText);
   check('DE account remains plain text', !links().some(a=>a.textContent === 'KF6UFO'));
   check('existing View links preserved', d.querySelectorAll('a[href^="https://logbook.qrz.com/"]').length === 2);
   check('unrelated content remains untouched', !d.querySelector('#alert125 a, #other a, #alert126 a'));
   run();
-  check('repeat injection is idempotent', links().length === 4 && !d.querySelector('a a'));
+  check('repeat injection is idempotent', links().length === 5 && !d.querySelector('a a'));
   await load(); run({...location, search:'?account/alerts&page=2'});
-  check('pagination supported', frame.contentDocument.querySelectorAll('[data-qrz-notification-callsign]').length === 4);
+  check('pagination supported', frame.contentDocument.querySelectorAll('[data-qrz-notification-callsign]').length === 5);
   for (const [name, where] of [
     ['other forum page', {...location, search:'?threads/example'}],
     ['lookalike query', {...location, search:'?account/alertsettings'}],

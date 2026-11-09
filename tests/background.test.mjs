@@ -486,7 +486,7 @@ for (const menuItemId of ['qrzLookup', 'qrzLogbook']) {
       await settle();
       if (menuItemId === 'qrzLookup') {
         assert.deepEqual(of(s, 'create').map(action => action[1]), [{
-          url: 'https://www.qrz.com/db/' + encodeURIComponent(expected), active: true, windowId: 2
+          url: 'https://www.qrz.com/db/' + expected, active: true, windowId: 2
         }]);
         assert.equal(of(s, 'searchLogbookPage').length, 0);
       } else {
@@ -507,7 +507,7 @@ for (const menuItemId of ['qrzLookup', 'qrzLogbook']) {
       linkUrl: 'https://example.org/station?id=123' }, SOURCE);
     await settle();
     if (menuItemId === 'qrzLookup') {
-      assert.equal(of(s, 'create')[0][1].url, 'https://www.qrz.com/db/EA8%2FKF6UFO%2FP');
+      assert.equal(of(s, 'create')[0][1].url, 'https://www.qrz.com/db/EA8/KF6UFO/P');
     } else {
       assert.equal(of(s, 'create').length, 0);
       assert.equal(of(s, 'searchLogbookPage')[0][1], 'EA8/KF6UFO/P');
@@ -594,10 +594,36 @@ for (const linkUrl of ['https://www.qrz.com/db/BW2%2FJP1RIW', 'https://www.qrz.c
     const s = await setup({ statuses: ['already-signed'] });
     s.clicked({ menuItemId: 'qrzWebLog', linkUrl }, SOURCE);
     await settle();
-    assert.equal(of(s, 'create')[0][1].url, 'https://www.qrz.com/db/BW2%2FJP1RIW');
+    assert.equal(of(s, 'create')[0][1].url, 'https://www.qrz.com/db/BW2/JP1RIW');
     assert.equal(runs(s, 'prepare')[0][1], 'BW2/JP1RIW');
   });
 }
+
+for (const info of [
+  { selectionText: 'K6VHF/HR9' },
+  { linkUrl: 'https://www.qrz.com/db/K6VHF/HR9' },
+  { linkUrl: 'https://www.qrz.com/db/K6VHF%2FHR9' }
+]) {
+  test(`K6VHF/HR9 opens its literal-slash destination and reports no Web Log: ${JSON.stringify(info)}`, async () => {
+    const s = await setup({ statuses: ['no-web-tab'] });
+    s.clicked({ menuItemId: 'qrzWebLog', ...info }, SOURCE);
+    await settle();
+    assert.deepEqual(of(s, 'create').map(action => action[1]), [{
+      url: 'https://www.qrz.com/db/K6VHF/HR9', active: false, windowId: 2, openerTabId: 1
+    }]);
+    assert.equal(runs(s, 'prepare')[0][1], 'K6VHF/HR9');
+    assert.equal(runs(s, 'sign').length, 0);
+    assert.equal(runs(s, 'bio')[0][1], 'K6VHF/HR9');
+    assert.match(of(s, 'showWebLogFeedback')[0][2], /K6VHF\/HR9 doesn't publish a Web Log/);
+  });
+}
+
+test('selected text lookup preserves K6VHF/HR9 in the station destination', async () => {
+  const s = await setup();
+  s.clicked({ menuItemId: 'qrzLookup', selectionText: 'k6vhf/hr9' }, SOURCE);
+  await settle();
+  assert.equal(of(s, 'create')[0][1].url, 'https://www.qrz.com/db/K6VHF/HR9');
+});
 
 test('a complete blank tab with pending navigation is not mistaken for a login redirect', async () => {
   let reads = 0;

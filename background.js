@@ -87,7 +87,8 @@ export async function signWebLog(callsign, sourceTab) {
   if (source.windowId !== sourceTab.windowId || Boolean(source.incognito) !== Boolean(sourceTab.incognito)) {
     throw new Error("The original tab moved or closed. Choose Sign Their Web Log again in its current window.");
   }
-  const url = "https://www.qrz.com/db/" + encodeURIComponent(callsign);
+  // QRZ requires literal slash delimiters; an encoded slash returns a 404 page.
+  const url = "https://www.qrz.com/db/" + encodeURIComponent(callsign).replace(/%2F/g, "/");
   const matches = value => {
     try {
       const parsed = new URL(value);
@@ -340,7 +341,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     return;
   }
   if (info.menuItemId === "qrzLookup") {
-    const options = { url: "https://www.qrz.com/db/" + encodeURIComponent(callsign), active: true };
+    const options = { url: "https://www.qrz.com/db/" + encodeURIComponent(callsign).replace(/%2F/g, "/"), active: true };
     if (tab?.windowId != null) options.windowId = tab.windowId;
     void chrome.tabs.create(options).catch(error => showError(error.message)).catch(console.error);
   } else if (info.menuItemId === "qrzLogbook") {
