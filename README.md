@@ -2,6 +2,12 @@
 
 Look up a station, search your QRZ Logbook, or sign a station’s Web Log from Chrome’s right-click menu. QRZ Callsign Extension puts these actions beside the callsign you’re reading, so you can spend less time copying callsigns and more time visiting station pages.
 
+## Video overview
+
+Watch [Making FT8 More Personal with the QRZ Chrome Extension](https://www.youtube.com/watch?v=rdVRU2V5uKE).
+
+[![Watch the video overview](https://img.youtube.com/vi/rdVRU2V5uKE/hqdefault.jpg)](https://www.youtube.com/watch?v=rdVRU2V5uKE)
+
 ## What it does
 
 | Menu action | What it does |
